@@ -46,30 +46,30 @@ import {
 
 // --- 资源配置 ---
 const ASSETS = {
-          BG_221B: "./pic/scene/scene_livingroom.png",
+          BG_221B: "./pic/scene/scene_livingroom.jpg",
           CHAR_HOLMES: "./pic/character/character_sherlock.png",
           CHAR_WATSON: "./pic/character/character_waston.png",
           CHAR_PETERSON: "./pic/character/character_peterson.png",
           CHAR_PLAYER: "./pic/character/character_player.png",
           CHAR_OWNER: "./pic/character/portrait_henry.png", // 失主画像
-          GEM: "./pic/event_blueCarbuncle.png", // 蓝宝石
+          GEM: "./pic/event_blueCarbuncle.jpg", // 蓝宝石
           BGM: "./voice/bgm/bgm1.mp3", // 背景音乐
-          EVENT_GOOSE: "./pic/event_goose.png",
-          EVENT_HAT: "./pic/event_hat.png",
-          BG_DEDUCTION: "./pic/scene/scene3.png",
-          BG_CLIMAX: "./pic/scene/scene4.png",
-          BG_END: "./pic/chapter.png"
+          EVENT_GOOSE: "./pic/event_goose.jpg",
+          EVENT_HAT: "./pic/event_hat.jpg",
+          BG_DEDUCTION: "./pic/scene/scene3.jpg",
+          BG_CLIMAX: "./pic/scene/scene4.jpg",
+          BG_END: "./pic/chapter.jpg"
 };
 
 // --- 线索数据定义 ---
 const RAW_CLUES = [
-          { id: 'goose_tag', name: '给亨利·贝克太太的卡片', desc: '系在鹅腿上的小卡片', detail: '上面写着：“谨奉亨利·贝克太太”。', imgUrl: "./pic/clues/clues_goose_tag.png", category: 'goose' },
-          { id: 'ribbon', name: '变色但质地优良的罗缎', desc: '帽檐丝带', detail: '丝带是罗缎材质，三年前非常流行的款式，虽然变色了，但质地依然昂贵。', imgUrl: "./pic/clues/clues_ribbon.png", category: 'hat' },
-          { id: 'lining', name: '墨水涂痕', desc: '内衬底部', detail: '帽子表面有黑色污迹，不是墨水泼上去的，而是有人故意涂抹，试图把褪色的地方涂黑。', imgUrl: "./pic/clues/clues_lining.png", category: 'hat' },
-          { id: 'strap', name: '断裂的防风固定扣', desc: '帽带装置', detail: '帽檐旁缝着一个金属圆箍（用来穿防风松紧带），但松紧带已经断裂丢失，没有更换。', imgUrl: "./pic/clues/clues_strap.png", category: 'hat' },
-          { id: 'edge', name: '帽子积满灰尘', desc: '内侧边缘', detail: '积满了一层厚厚的褐色绒尘，帽子长期挂在室内无人打理。', imgUrl: "./pic/clues/clues_edge.png", category: 'hat' },
-          { id: 'hair', name: '刚理发并涂了发乳', desc: '细碎发茬与气味', detail: '闻起来有柠檬发乳味，还有细碎的、剪断的头发茬。', imgUrl: "./pic/clues/clues_hair.png", category: 'hat' },
-          { id: 'top_wax', name: '帽子上的白色蜡滴', desc: '帽顶表面', detail: '有几滴已经凝固变硬的白色斑点。', imgUrl: "./pic/clues/clues_topwax.png", category: 'hat' }
+          { id: 'goose_tag', name: '给亨利·贝克太太的卡片', desc: '系在鹅腿上的小卡片', detail: '上面写着：“谨奉亨利·贝克太太”。', imgUrl: "./pic/clues/clues_goose_tag.jpg", category: 'goose' },
+          { id: 'ribbon', name: '变色但质地优良的罗缎', desc: '帽檐丝带', detail: '丝带是罗缎材质，三年前非常流行的款式，虽然变色了，但质地依然昂贵。', imgUrl: "./pic/clues/clues_ribbon.jpg", category: 'hat' },
+          { id: 'lining', name: '墨水涂痕', desc: '内衬底部', detail: '帽子表面有黑色污迹，不是墨水泼上去的，而是有人故意涂抹，试图把褪色的地方涂黑。', imgUrl: "./pic/clues/clues_lining.jpg", category: 'hat' },
+          { id: 'strap', name: '断裂的防风固定扣', desc: '帽带装置', detail: '帽檐旁缝着一个金属圆箍（用来穿防风松紧带），但松紧带已经断裂丢失，没有更换。', imgUrl: "./pic/clues/clues_strap.jpg", category: 'hat' },
+          { id: 'edge', name: '帽子积满灰尘', desc: '内侧边缘', detail: '积满了一层厚厚的褐色绒尘，帽子长期挂在室内无人打理。', imgUrl: "./pic/clues/clues_edge.jpg", category: 'hat' },
+          { id: 'hair', name: '刚理发并涂了发乳', desc: '细碎发茬与气味', detail: '闻起来有柠檬发乳味，还有细碎的、剪断的头发茬。', imgUrl: "./pic/clues/clues_hair.jpg", category: 'hat' },
+          { id: 'top_wax', name: '帽子上的白色蜡滴', desc: '帽顶表面', detail: '有几滴已经凝固变硬的白色斑点。', imgUrl: "./pic/clues/clues_topwax.jpg", category: 'hat' }
 ];
 
         // --- 演绎推理逻辑配置 ---
