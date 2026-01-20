@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蓝宝石案 - 第一幕</title>
+    
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 引入 Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- 配置模块映射 -->
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "lucide-react": "https://esm.sh/lucide-react@0.292.0"
+        }
+    }
+    </script>
+    
+    <style>
+        body { margin: 0; background-color: #f3f4f6; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+import React, { useState, useEffect, useRef } from 'react';
+        import { createRoot } from 'react-dom/client';
+import { 
+  Brain, ArrowRight, Star, Fingerprint, 
+  Sparkles, Pencil, ClipboardList, 
+  CheckCircle2, RotateCcw, MapPin, 
+  User, HelpCircle, Link2, ZoomIn, Info,
+          Rotate3d, Move, Search, Pin, Paperclip, Trophy, Quote, Zap, MessageSquare, Flame, X, Book, AlertTriangle, Play, SkipForward, Clock, Gem, History
+} from 'lucide-react';
+
+// --- 系统配置 ---
+        const DIFY_BASE_URL = "http://ops.pd.ximalaya.local/dify/v1";
+        const DIFY_API_KEY = "app-9FD0h0sdZ3yBkDla76BJq9xd";
+
+// --- 资源配置 ---
+const ASSETS = {
+          BG_221B: "./pic/scene/scene_livingroom.png",
+          CHAR_HOLMES: "./pic/character/character_sherlock.png",
+          CHAR_WATSON: "./pic/character/character_waston.png",
+          CHAR_PETERSON: "./pic/character/character_peterson.png",
+          CHAR_PLAYER: "./pic/character/character_player.png",
+          CHAR_OWNER: "./pic/character/portrait_henry.png", // 失主画像
+          GEM: "./pic/event_blueCarbuncle.png", // 蓝宝石
+          BGM: "./voice/bgm/bgm1.mp3", // 背景音乐
+          EVENT_GOOSE: "./pic/event_goose.png",
+          EVENT_HAT: "./pic/event_hat.png",
+          BG_DEDUCTION: "./pic/scene/scene3.png",
+          BG_CLIMAX: "./pic/scene/scene4.png",
+          BG_END: "./pic/chapter.png"
+};
+
+// --- 线索数据定义 ---
+const RAW_CLUES = [
+          { id: 'goose_tag', name: '给亨利·贝克太太的卡片', desc: '系在鹅腿上的小卡片', detail: '上面写着：“谨奉亨利·贝克太太”。', imgUrl: "./pic/clues/clues_goose_tag.png", category: 'goose' },
+          { id: 'ribbon', name: '变色但质地优良的罗缎', desc: '帽檐丝带', detail: '丝带是罗缎材质，三年前非常流行的款式，虽然变色了，但质地依然昂贵。', imgUrl: "./pic/clues/clues_ribbon.png", category: 'hat' },
+          { id: 'lining', name: '墨水涂痕', desc: '内衬底部', detail: '帽子表面有黑色污迹，不是墨水泼上去的，而是有人故意涂抹，试图把褪色的地方涂黑。', imgUrl: "./pic/clues/clues_lining.png", category: 'hat' },
+          { id: 'strap', name: '断裂的防风固定扣', desc: '帽带装置', detail: '帽檐旁缝着一个金属圆箍（用来穿防风松紧带），但松紧带已经断裂丢失，没有更换。', imgUrl: "./pic/clues/clues_strap.png", category: 'hat' },
+          { id: 'edge', name: '帽子积满灰尘', desc: '内侧边缘', detail: '积满了一层厚厚的褐色绒尘，帽子长期挂在室内无人打理。', imgUrl: "./pic/clues/clues_edge.png", category: 'hat' },
+          { id: 'hair', name: '刚理发并涂了发乳', desc: '细碎发茬与气味', detail: '闻起来有柠檬发乳味，还有细碎的、剪断的头发茬。', imgUrl: "./pic/clues/clues_hair.png", category: 'hat' },
+          { id: 'top_wax', name: '帽子上的白色蜡滴', desc: '帽顶表面', detail: '有几滴已经凝固变硬的白色斑点。', imgUrl: "./pic/clues/clues_topwax.png", category: 'hat' }
+];
+
+        // --- 演绎推理逻辑配置 ---
+        const DEDUCTION_LOGIC = {
+          finance: { 
+            title: '家道中落', 
+            required: ['ribbon', 'strap', 'lining'],
+            desc: "曾经富裕(罗缎)但如今落魄(断带)"
+          },
+          domestic: { 
+            title: '夫妻冷淡', 
+            required: ['edge', 'goose_tag'],
+            desc: "有妻子(卡片)但不再照顾他(积灰)"
+          },
+          appearance: { 
+            title: '维持体面', 
+            required: ['hair'],
+            desc: "试图掩盖窘迫(理发/发乳)"
+          },
+          environment: { 
+            title: '家中简陋无煤气灯', 
+            required: ['top_wax'],
+            desc: "只能使用蜡烛照明(蜡滴)"
+          }
+};
+
+const DOSSIER_SLOTS = [
+          { key: 'finance', label: '经济状况', color: 'bg-yellow-50', icon: <Star size={16}/> },
+          { key: 'domestic', label: '家庭关系', color: 'bg-red-50', icon: <User size={16}/> },
+          { key: 'appearance', label: '外貌状态', color: 'bg-blue-50', icon: <Fingerprint size={16}/> },
+          { key: 'environment', label: '居住情况', color: 'bg-green-50', icon: <Flame size={16}/> }
+];
+
+        // --- 演绎推理剧本配置 ---
+        const say = (speaker, text, char = null, isGemMoment = false, nextState = null) => ({ speaker, text, char, isGemMoment, nextState });
+        
+        const DEDUCTION_SCRIPTS = {
+          q1: {
+            question: "福尔摩斯：线索已经摆在面前了。现在，运用你的脑细胞，完成帽子主人的侧写吧。",
+    options: [
+              { 
+                id: 'a', 
+                text: "A. 他一直很穷，这帽子是他从二手旧货摊买的。", 
+                correct: false,
+                script: [
+                  say("福尔摩斯", "（叹气，重重地倒回沙发）看来我教你的关于“观察”的一课你全还给我了。二手货？你摸过那丝带的质地吗？那是顶级的罗缎！穷人买不起这种帽子。", "CHAR_HOLMES"),
+                  say("华生", "别太严厉了，福尔摩斯。小队长，注意那个款式，那是三年前最时髦的昂贵货。", "CHAR_WATSON"),
+                  say("我", "啊，我明白了……既然是三年前买的昂贵货，说明他那时有钱。", "CHAR_PLAYER")
+                ]
+              },
+              { 
+                id: 'b', 
+                text: "B. 他曾经富裕过，但这几年家道中落，意志消沉。", 
+                correct: true,
+                script: [
+                  { speaker: "福尔摩斯", text: "（嘴角微微上扬）正是如此。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/正是如此。.m4a" },
+                  say("我", "这帽子三年前买时很贵，说明他当时有钱。但他现在还戴着这顶破帽子，说明这三年他走了下坡路。", "CHAR_PLAYER"),
+                  { speaker: "福尔摩斯", text: "而且他以前特意装了防风帽带，说明他曾经精打细算；现在帽带断了都不换，说明他意志消沉，很可能染上了酗酒的恶习。很好，继续。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/而且他以前特.m4a" }
+                ]
+              },
+              { 
+                id: 'c', 
+                text: "C. 他是个守财奴，有钱但不舍得花。", 
+                correct: false,
+                script: [
+                  say("福尔摩斯", "守财奴？逻辑不通。看看那些墨水痕迹，他试图掩盖褪色。", "CHAR_HOLMES"),
+                  say("福尔摩斯", "守财奴根本不在乎体面，只有那些曾经体面过、现在却无力维持的人，才会做这种可悲的掩饰。", "CHAR_HOLMES"),
+                  say("华生", "别太严厉了，福尔摩斯。小队长，再仔细想想。", "CHAR_WATSON")
+                ]
+              }
+    ]
+  },
+          q2: {
+    question: "福尔摩斯：看看帽子上的灰尘，关于他的家庭生活，你能得出什么结论？",
+    options: [
+              { 
+                id: 'a', 
+                text: "A. 他是个单身汉，没人照顾起居。", 
+                correct: false,
+                script: [
+                  say("福尔摩斯", "单身汉？你是金鱼的记忆力吗？刚才彼得森那只鹅的腿上写着什么？“献给亨利·贝克太太”。", "CHAR_HOLMES"),
+                  say("我", "哦，对……他有妻子。", "CHAR_PLAYER")
+                ]
+              },
+              { 
+                id: 'b', 
+                text: "B. 他是个流浪汉，整天露宿街头。", 
+                correct: false,
+                script: [
+                  say("福尔摩斯", "流浪汉？用你的眼睛看，那是褐色的室内绒尘，不是街道上的灰色沙砾！这帽子大部分时间挂在家里。", "CHAR_HOLMES"),
+                  say("华生", "小队长，想想看，如果这帽子挂在家里……", "CHAR_WATSON")
+                ]
+              },
+              { 
+                id: 'c', 
+                text: "C. 他的妻子已经不再爱他了。", 
+                correct: true,
+                script: [
+                  { speaker: "福尔摩斯", text: "（冷笑一声）虽然残忍，但却是事实。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/虽然残忍，但.m4a" },
+                  say("我", "帽子上积了整整一周的灰尘没刷过。如果他的妻子还爱他，绝不会让他戴着这种脏帽子出门。", "CHAR_PLAYER"),
+                  { speaker: "华生", text: "（惊讶）天哪，这推论……虽然有道理，但这也太令人难过了。", char: "CHAR_WATSON", audio: "./voice/chapter1/waston/天哪，这推论.m4a" },
+                  { speaker: "福尔摩斯", text: "华生，我们在谈逻辑，不是谈感情。下一题。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/华生，我们在.m4a" },
+                ]
+              }
+    ]
+  },
+          q3: {
+    question: "福尔摩斯：最后，为这个男人做一个精准的画像。",
+    options: [
+              { 
+                id: 'a', 
+                text: "A. 一个刚理完发的中年人，虽然落魄但仍试图保持体面，家里没有通煤气。", 
+                correct: true,
+                script: [
+                  { speaker: "福尔摩斯", text: "（猛地拍了一下沙发扶手）BINGO！非常精彩的侧写！", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/BINGO！.m4a" },
+                  say("我", "首先，内衬边缘有细碎的头发茬，说明他这几天刚理过发。", "CHAR_PLAYER"),
+                  { speaker: "我", text: "而且既然刚理发，帽子里却还有那种浓烈的柠檬发乳味，说明他在努力打理自己，试图掩盖贫穷，维持最后的体面。", char: "CHAR_WATSON", audio: "./voice/chapter1/waston/而且既然刚理.m4a" },
+                  say("我", "至于那些白斑，那是蜡烛油。说明他家里没有通煤气，他经常一手拿着帽子，一手端着蜡烛上楼，蜡油才会滴在那个位置。", "CHAR_PLAYER"),
+                  { speaker: "福尔摩斯", text: "(鼓掌）完全正确，小队长。你看，这就是那个陌生人：亨利·贝克。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/完全正确，小.m4a" },
+                  { speaker: "福尔摩斯", text: "中年，曾经富裕现已落魄，有些酗酒和懒散，夫妻关系冷淡，家里没有煤气，但这几天刚理了发并涂了廉价发油，正试图讨好他的妻子。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/中年，曾经富.m4a" }
+                ]
+              },
+              { 
+                id: 'b', 
+                text: "B. 一个几天没洗头的粉刷匠，工作时帽子沾上了白灰。", 
+                correct: false,
+                script: [
+                  say("福尔摩斯", "（痛苦地按住太阳穴）华生，给我们的小队长开点眼药水吧。", "CHAR_HOLMES"),
+                  say("福尔摩斯", "如果是粉刷匠或蹭到油漆，斑点不会长这个样子，另外斑点也不会只有这几滴。", "CHAR_HOLMES"),
+                  say("福尔摩斯", "而且，你闻不到吗？那是柠檬发乳的味道，不是油漆味。我亲爱的小队长，你的想象力真是丰富得没用在正道上。", "CHAR_HOLMES"),
+                  say("华生", "小队长，仔细看，那是受热融化后又凝固的硬块。再试一次吧。", "CHAR_WATSON")
+                ]
+              },
+              { 
+                id: 'c', 
+                text: "C. 一个喜欢用发油的年轻人，刚才在街上不小心蹭到了刚刷的油漆。", 
+                correct: false,
+                script: [
+                  say("福尔摩斯", "（痛苦地按住太阳穴）华生，给我们的小队长开点眼药水吧。", "CHAR_HOLMES"),
+                  say("福尔摩斯", "如果是粉刷匠或蹭到油漆，斑点不会长这个样子，另外斑点也不会只有这几滴。", "CHAR_HOLMES"),
+                  say("福尔摩斯", "而且，你闻不到吗？那是柠檬发乳的味道，不是油漆味。我亲爱的小队长，你的想象力真是丰富得没用在正道上。", "CHAR_HOLMES"),
+                  say("华生", "小队长，仔细看，那是受热融化后又凝固的硬块。再试一次吧。", "CHAR_WATSON")
+                ]
+              }
+    ]
+  }
+        };
+
+        const HAT_QUIZ_ORDER = ['q1', 'q2', 'q3'];
+
+// --- 剧本数据 ---
+const ACT1_INTRO_SCRIPT = [
+    { speaker: "旁白", text: "（我推开贝克街221B厚重的橡木门，抖落肩上的积雪。屋里暖意融融，混合着烟草和咖啡的香气。）" },
+    { speaker: "我", text: "早上好，福尔摩斯先生，华生医生，圣诞快乐！抱歉，外面的雪太大了。", char: "CHAR_PLAYER"},
+    { speaker: "华生", text: "（如释重负地放下报纸，笑着迎上来）感谢上帝，你终于来了，我们的华尔街小分队队长！快把大衣挂上。你要是再不来，福尔摩斯就要把这顶脏帽子看出一个洞来了！", char: "CHAR_WATSON", audio: "./voice/update_chapter1/waston/感谢上帝，你.m4a" },
+    { speaker: "福尔摩斯", text: "（正透过放大镜专注地盯着帽子，听见推门声后，抬起头望了一眼这边）快关门，华生，除非你想把伦敦的雾霾也请进来喝茶。", char: "CHAR_HOLMES", audio: "./voice/update_chapter1/sherlock/快关门，华生.m4a" },
+    { speaker: "福尔摩斯", text: "（笑了笑）来得正是时候，小队长。擦擦你的靴子，上面沾着的红色粘土说明你刚才为了抄近道，又穿过了还在施工的汉诺威广场——我说的对吗？", char: "CHAR_HOLMES", audio: "./voice/update_chapter1/sherlock/来得正是时候.m4a" },
+    { speaker: "我", text: "啊…确实是这样。真是什么都瞒不过您，福尔摩斯先生。", char: "CHAR_PLAYER" },
+    { speaker: "福尔摩斯", text: "（兴致勃勃地看向我，声音里带着些许兴奋）让我们省去那些无聊的寒暄吧。华生太过感性，彼得森太过老实，而我正需要一颗新鲜、冷静、且有逻辑的大脑。", char: "CHAR_HOLMES", audio: "./voice/update_chapter1/sherlock/让我们省去那.m4a" },
+    { speaker: "我", text: "（受宠若惊又有点好奇）发生什么事了？", char: "CHAR_PLAYER" },
+    { speaker: "我", text: "我看桌上这……这组合挺别致的。一只死鹅，配一顶破帽子？", char: "CHAR_PLAYER" },
+    { speaker: "旁白", text: "（一只喂得很好的大白鹅，左腿上系着一张小卡片。）", popupInfo: { key: "EVENT_GOOSE", title: "圣诞肥鹅", desc: "“一只上好的大白鹅，足够一家人享用。”" } },
+    { speaker: "旁白", text: "（以及一顶破旧的黑色硬毡帽。）", popupInfo: { key: "EVENT_HAT", title: "破旧毡帽", desc: "“帽檐耷拉着，积满了灰尘，看起来已经很久没人打理了。”" } },
+    { speaker: "彼得森", text: "呃，是啊小神探队长，这是我捡到的。我正想问问福尔摩斯先生能不能把这鹅处理了，它都要开始发那股味儿了……（局促地搓着手，站在桌边）", char: "CHAR_PETERSON", audio: "./voice/update_chapter1/peterson/呃，是啊小神.m4a" },
+    { speaker: "福尔摩斯", text: "（终于放下了帽子，用烟斗柄指了指桌子）彼得森管这叫废品，但在我眼里，这是一个微小而精妙的智力游戏。彼得森，把你精彩的“遭遇战”给队长讲讲。", char: "CHAR_HOLMES", audio: "./voice/update_chapter1/sherlock/彼得森管这叫.m4a" },
+    { speaker: "彼得森", text: "（咽了口唾沫，声情并茂地比划起来）我跟你说小队长，你绝对想不到发生了什么！", char: "CHAR_PETERSON", audio: "./voice/update_chapter1/peterson/我跟你说小队.m4a" },
+    { speaker: "彼得森", text: "圣诞节那天凌晨四点的时候，我在街上巡逻。前面有个高个子男人背着这只鹅走着走着，街边突然冲出来几个小流氓！", char: "CHAR_PETERSON", audio: "./voice/update_chapter1/peterson/圣诞节那天凌.m4a" },
+    { speaker: "彼得森", text: "那个男人为了自卫，挥起手杖——结果“哗啦”一声！他不小心把身后商店的橱窗玻璃给砸了个粉碎！", char: "CHAR_PETERSON", audio: "./voice/update_chapter1/peterson/那个男人为了.m4a" },
+    { speaker: "彼得森", text: "我本想跑过去帮忙的，结果那人看我穿着制服，以为我是警察去抓他的，吓得魂都没了！他扔下这鹅和帽子，像受惊的兔子一样钻进小巷跑没影了！", char: "CHAR_PETERSON", audio: "./voice/update_chapter1/peterson/我本想跑过去.m4a" },
+    { speaker: "彼得森", text: "我想物归原主，可这茫茫人海的，实在没处找去。", char: "CHAR_PETERSON", audio: "./voice/update_chapter1/peterson/我想物归原主.m4a" },
+    { speaker: "我", text: "让我理一理……这是因为怕赔玻璃钱，连圣诞晚餐都不要了？", char: "CHAR_PLAYER" },
+    { speaker: "福尔摩斯", text: "非常精准的总结。", char: "CHAR_HOLMES",audio: "./voice/update_chapter1/sherlock/非常精准的总.m4a" },
+    { speaker: "华生", text: "（鼓掌）所以结局就是，彼得森在行侠仗义时意外收获了这只肥鹅和这顶破帽子。", char: "CHAR_WATSON", audio: "./voice/update_chapter1/waston/所以结局就是.m4a"  },
+    { speaker: "旁白", text: "（说完，福尔摩斯、华生、彼得森三个人，齐齐看向了我）" },
+    { speaker: "福尔摩斯", text: "（站起身，将放大镜柄塞进我手里，眼神中满含鼓励）来吧，小队长。你一直自诩学到了我的皮毛，现在就是证明自己的机会。先帮彼得森看看那只鹅，能不能找到什么线索？", char: "CHAR_HOLMES", audio: "./voice/update_chapter1/sherlock/来吧，小队长.m4a", nextState: "GOOSE_SEARCH" }
+];
+
+const GOOSE_QUIZ_SCRIPT = [
+          { speaker: "我", text: "这很简单，福尔摩斯先生……", char: "CHAR_PLAYER", nextAction: 'QUIZ' }
+];
+
+const GOOSE_A_REACTION = [
+          { speaker: "福尔摩斯", text: "（轻轻点了点头，嘴角露出一丝满意的微笑）观察力还在。如果是自己买的，通常不需要系这种赠言卡片。这显然是一个男人试图带回家讨好妻子的“和平鸽”——或者说“和平鹅”。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/观察力还在。.m4a" },
+          { speaker: "我", text: "那我们只要找到亨利·贝克太太就行了？", char: "CHAR_PLAYER" },
+          { speaker: "福尔摩斯", text: "这就是问题的所在。你以为你找到了钥匙，其实你面对的是一堵墙。 ", char: "CHAR_HOLMES", audio:"./voice/update_chapter1/sherlock/这就是问题的.m4a" },
+          { speaker: "福尔摩斯", text: "伦敦城里叫亨利·贝克的人，恐怕比这只鹅身上的羽毛还要多。要在几百个亨利·贝克里找到这一个，可不是件容易事。", char: "CHAR_HOLMES", audio:"./voice/update_chapter1/sherlock/伦敦城里叫亨.m4a"},
+          { speaker: "彼得森", text: "那……那这鹅怎么办？", char: "CHAR_PETERSON", audio:"./voice/updater_chapter1/peterson/那……那这鹅.m4a" },
+          { speaker: "福尔摩斯", text: "既然找不到人，这只鹅如果不吃掉就太浪费了。彼得森，把它带回去吧，让它成为你家餐桌上的美味。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/既然找不到人.m4a" },
+          { speaker: "彼得森", text: "天哪！真的吗？太感谢您了！", char: "CHAR_PETERSON", audio:"./voice/update_chapter1/peterson/天哪！真的吗.m4a" },
+          { speaker: "旁白", text: "(彼得森一把抱起大肥鹅，千恩万谢地冲出了门)", char: null },
+          { speaker: "福尔摩斯", text: "至于这顶帽子——（福尔摩斯用镊子夹起那顶破帽子）——留给我。这才是我感兴趣的智力游戏。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/至于这顶帽子.m4a" },
+          { speaker: "福尔摩斯", text: "来吧小队长，坐到椅子上来，拿起放大镜。向我证明，你配得上“贝克街小分队队长”这个头衔。", char: "CHAR_HOLMES", audio: "./voice/update_chapter1/sherlock/来吧小队长，.m4a" },
+          { speaker: "华生", text: "福尔摩斯，你又要开始折磨这孩子了。这不过是一顶没人要的破毡帽。", char: "CHAR_WATSON", audio: "./voice/chapter1/waston/福尔摩斯，你 (1).m4a" },
+          { speaker: "福尔摩斯", text: "不，华生。这是一部自传。小队长，点击这顶帽子的细节，告诉我这顶帽子的主人是个什么样的人。别让我失望。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/不，华生。这.m4a", nextState: "SCRUTINY" }
+];
+
+const GOOSE_B_REACTION = [
+          { speaker: "福尔摩斯", text: "（皱起眉头，用烟斗柄敲了敲桌子）你的逻辑是跟着鹅一起冻僵了吗？队长，那是你的直觉在说话，不是脑子。", char: "CHAR_HOLMES", audio:"./voice/update_chapter1/sherlock/你的逻辑是跟.m4a" },
+          { speaker: "福尔摩斯", text: "来看看那个介词——“谨奉（For）”。如果这只鹅是太太自己买的，为什么需要在腿上系一张写给自己的卡片？而且，彼得森刚才说了，拿着鹅的是位男士。", char: "CHAR_HOLMES", audio:"./voice/update_chapter1/sherlock/来看看那个介.m4a" },
+          { speaker: "华生", text: "（温和地提醒）我想小队长的意思是，这可能是那个家庭的采购物品。不过队长，看这卡片的格式，这更像是一份礼物，或者是那个丈夫带回家的赔罪礼。", char: "CHAR_WATSON", audio: "./voice/update_chapter1/waston/我想小队长的.m4a" },
+          { speaker: "我", text: "啊，确实……是我疏忽了。", char: "CHAR_PLAYER", redoQuiz: true }
+        ];
+
+        // --- Act 1 Climax Script ---
+        const ACT1_CLIMAX_SCRIPT = [
+          say("我", "呼……这些推论真的是非常巧妙啊。即使只是一顶破帽子，竟然也能读出这么多信息。", "CHAR_PLAYER"),
+          say("我", "不过福尔摩斯，既然这只是一只丢了的旧帽子，这些推理有什么用呢，是不是有点太浪费脑力了？", "CHAR_PLAYER"),
+          say("旁白", "（福尔摩斯刚想说话，外面突然传来一阵急促沉重的脚步声。）"),
+          say("旁白", "（门被猛地撞开，彼得森像个疯子一样冲了进来，手里举着什么东西，甚至没来得及敲门）", "CHAR_PETERSON"),
+          { speaker: "彼得森", text: "福尔摩斯先生！那只鹅！那只鹅！", char: "CHAR_PETERSON", audio: "./voice/chapter1/peterson/福尔摩斯先生.m4a" },
+          { speaker: "福尔摩斯", text: "怎么？它复活飞走了？", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/怎么？它复活.m4a" },
+          { speaker: "彼得森", text: "不！看！看我老婆在清理它的嗉子时，找到了什么！", char: "CHAR_PETERSON", audio: "./voice/chapter1/peterson/不！看！看我.m4a" },
+          say("旁白", "（彼得森颤抖着摊开粗糙的大手。在他掌心中央，躺着一颗比蚕豆略小、却光华璀璨的蓝色石头，仿佛凝聚了所有的星光，闪烁着电火花般的光芒。）", "CHAR_PETERSON", true),
+          say("我", "这……这是……", "CHAR_PLAYER"),
+          { speaker: "福尔摩斯", text: "天哪，彼得森！你立大功了。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/天哪，彼得森.m4a" },
+          { speaker: "华生", text: "这难道是……", char: "CHAR_WATSON", audio: "./voice/chapter1/waston/这难道是…… (1).m4a" },
+          { speaker: "福尔摩斯", text: "没错，这正是那颗宝石。莫尔卡伯爵夫人的蓝宝石。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/没错，这正是.m4a" },
+          { speaker: "华生", text: "我知道这颗宝石！最近《泰晤士报》天天都在登寻物启事。", char: "CHAR_WATSON", audio: "./voice/chapter1/waston/我知道这颗宝 (1).m4a" },
+          { speaker: "福尔摩斯", text: "（边说边翻出一张旧报纸）大都会酒店珠宝失窃案……五天前失窃，悬赏一千英镑，一千英镑可还不到它真实价值的二十分之一。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/大都会酒店珠.m4a" },
+          { speaker: "福尔摩斯", text: "它是在大都会酒店丢的，管子工约翰·霍纳已经被指控盗窃。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/它是在大都会.m4a" },
+          { speaker: "福尔摩斯", text: "看来你刚才说错了，小队长。这不再是一个关于丢帽子的无聊故事了。这是一桩价值连城的重罪案，而唯一的线索，就在刚才那顶被你看不起的破帽子里。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/看来你刚才说.m4a" },
+          { speaker: "福尔摩斯", text: "游戏，正式开始。", char: "CHAR_HOLMES", audio: "./voice/chapter1/sherlock/游戏，正式开.m4a", nextState: "REWARD" }
+        ];
+
+// --- 组件：打字机 ---
+const Typewriter = ({ text, onComplete }) => {
+  const [display, setDisplay] = useState("");
+  const [index, setIndex] = useState(0);
+  useEffect(() => { setDisplay(""); setIndex(0); }, [text]);
+  useEffect(() => {
+    if (index < text.length) {
+      const t = setTimeout(() => { setDisplay(v => v + text.charAt(index)); setIndex(i => i + 1); }, 25);
+      return () => clearTimeout(t);
+    } else if (onComplete) onComplete();
+  }, [index, text, onComplete]);
+  return <span>{display}</span>;
+};
+
+const App = () => {
+  // --- 状态控制 ---
+  const [gameState, setGameState] = useState('INTRO'); 
+  const [script, setScript] = useState(ACT1_INTRO_SCRIPT);
+  const [scriptIdx, setScriptIdx] = useState(0);
+  const [isTyping, setIsTyping] = useState(true);
+  const [isShaking, setIsShaking] = useState(false);
+  const [foundClueIds, setFoundClueIds] = useState([]);
+  const [selectedClue, setSelectedClue] = useState(null);
+  const [isNotebookOpen, setIsNotebookOpen] = useState(false);
+          const [isBgmPlaying, setIsBgmPlaying] = useState(true); // BGM 默认开启
+          
+  const [quizIdx, setQuizIdx] = useState(0);
+  const [detectiveReport, setDetectiveReport] = useState("");
+  const [isAiLoading, setIsAiLoading] = useState(false);
+          
+          // --- 游戏数据统计 ---
+          // 用于记录玩家的表现
+          const [performanceLog, setPerformanceLog] = useState({
+              scrutiny: { startTime: null, endTime: null }, // 搜证环节
+              quiz: [], // 问答环节记录: [{ question, attempts: [{ option, isCorrect, timeTaken, responseScript }] }]
+              dossier: { startTime: null, endTime: null, actions: [] } // 推理板环节: actions: [{ slot, clue, isCorrect, timeOffset }]
+          });
+          const [stageStartTime, setStageStartTime] = useState(null); // 当前小阶段开始时间
+
+          // 新的 Dossier 状态
+          // slotState: { [slotKey]: [clueId1, clueId2] }
+          const [slotState, setSlotState] = useState({ finance: [], domestic: [], appearance: [], environment: [] });
+          const [draggedClue, setDraggedClue] = useState(null);
+  const [aiFeedback, setAiFeedback] = useState("");
+          const [isPortraitRevealed, setIsPortraitRevealed] = useState(false);
+
+          const [lastQuizCorrect, setLastQuizCorrect] = useState(false);
+          
+          // REWARD Scene States
+          const [rewardHistory, setRewardHistory] = useState([]); // [{speaker, content}]
+          const [rewardQueue, setRewardQueue] = useState([]); // [{speaker, content}]
+          // REWARD 阶段的状态
+          const [selectedRewardOption, setSelectedRewardOption] = useState(null);
+          const [rewardDialogIndex, setRewardDialogIndex] = useState(1); // 初始对话显示进度 (默认显示第一条)
+          const [rewardResponseIndex, setRewardResponseIndex] = useState(0); // 回应对话显示进度
+
+          // 历史对话功能
+          const [showHistory, setShowHistory] = useState(false);
+          const [historyLog, setHistoryLog] = useState([]);
+
+  const mountRefGoose = useRef(null);
+  const mountRefHat = useRef(null);
+  const historyScrollRef = useRef(null);
+  const foundClueIdsRef = useRef([]);
+          const audioRef = useRef(null);
+          const bgmRef = useRef(null);
+
+  useEffect(() => { foundClueIdsRef.current = foundClueIds; }, [foundClueIds]);
+
+  // 历史对话自动滚动到底部
+  useEffect(() => {
+      if (showHistory && historyScrollRef.current) {
+          historyScrollRef.current.scrollTop = historyScrollRef.current.scrollHeight;
+      }
+  }, [showHistory]);
+          
+          // BGM 控制 Effect
+          useEffect(() => {
+              if (bgmRef.current) {
+                  if (isBgmPlaying) {
+                      bgmRef.current.volume = 0.3;
+                      bgmRef.current.play().catch(e => console.log("BGM play failed", e));
+                  } else {
+                      bgmRef.current.pause();
+                  }
+              }
+          }, [isBgmPlaying]);
+
+          // 进入新阶段时重置计时器 & 记录搜证开始时间
+          useEffect(() => {
+              // 搜证开始
+              if (gameState === 'SCRUTINY') {
+                  setPerformanceLog(prev => ({ ...prev, scrutiny: { ...prev.scrutiny, startTime: Date.now() } }));
+              }
+              // 搜证结束（进入问答）
+              if (gameState === 'HAT_DEDUCTION' && !performanceLog.scrutiny.endTime && performanceLog.scrutiny.startTime) {
+                   setPerformanceLog(prev => ({ ...prev, scrutiny: { ...prev.scrutiny, endTime: Date.now() } }));
+              }
+
+              // 问答开始计时 (每题开始)
+              if (gameState === 'HAT_DEDUCTION') {
+                  setStageStartTime(Date.now());
+              }
+
+              // 推理板开始
+              if (gameState === 'DOSSIER' && !performanceLog.dossier.startTime) {
+                  setPerformanceLog(prev => ({ ...prev, dossier: { ...prev.dossier, startTime: Date.now() } }));
+              }
+              // 推理板结束 (画像揭示)
+              if (isPortraitRevealed && !performanceLog.dossier.endTime) {
+                  setPerformanceLog(prev => ({ ...prev, dossier: { ...prev.dossier, endTime: Date.now() } }));
+              }
+          }, [gameState, quizIdx, isPortraitRevealed]);
+
+  // --- 核心处理器 ---
+  const handleNextLine = () => {
+    if (isTyping) { setIsTyping(false); return; }
+
+    // 记录历史对话
+    const currentLine = script[scriptIdx];
+    if (currentLine && currentLine.speaker && currentLine.speaker !== "旁白") {
+        setHistoryLog(prev => [...prev, currentLine]);
+    }
+
+    if (scriptIdx < script.length - 1) {
+      setScriptIdx(i => i + 1);
+      setIsTyping(true);
+    } else {
+              // 脚本结束时的跳转逻辑
+      const current = script[scriptIdx];
+      if (current.nextAction === 'QUIZ') { setGameState('GOOSE_QUIZ'); return; }
+      if (current.nextState) setGameState(current.nextState);
+      if (current.redoQuiz) setGameState('GOOSE_SEARCH');
+              
+              // 演绎推理专用跳转
+              if (gameState === 'DEDUCTION_REACTION') {
+                  if (lastQuizCorrect) {
+                      // 答对了
+                      if (quizIdx < HAT_QUIZ_ORDER.length - 1) {
+                          setQuizIdx(prev => prev + 1);
+                          setGameState('HAT_DEDUCTION');
+                      } else {
+                          // 跳过思维工坊，直接进入高潮
+                          generateFinalReport(); // 后台生成报告
+                          setScript(ACT1_CLIMAX_SCRIPT);
+                          setScriptIdx(0);
+                          setIsTyping(true);
+                          setGameState('ACT1_CLIMAX');
+                      }
+                  } else {
+                      // 答错了，重试
+                      setGameState('HAT_DEDUCTION');
+                  }
+              }
+    }
+  };
+
+  const handleGooseQuizSelection = (isA) => {
+    setGameState('ACT1_DIALOGUE');
+    setScriptIdx(0);
+    setIsTyping(true);
+    setScript(isA ? GOOSE_A_REACTION : GOOSE_B_REACTION);
+  };
+
+          // 处理演绎推理的选择
+          const handleDeductionSelection = (option) => {
+              // 记录答题数据
+              const quizId = HAT_QUIZ_ORDER[quizIdx];
+              const questionText = DEDUCTION_SCRIPTS[quizId].question;
+              const timeTaken = stageStartTime ? (Date.now() - stageStartTime) / 1000 : 0;
+              
+              setPerformanceLog(prev => {
+                  const currentQuizLog = prev.quiz.find(q => q.id === quizId) || { id: quizId, question: questionText, attempts: [] };
+                  const otherLogs = prev.quiz.filter(q => q.id !== quizId);
+                  
+                  // 记录本次尝试
+                  const newAttempt = {
+                      optionText: option.text,
+                      isCorrect: option.correct,
+                      timeTaken: timeTaken,
+                      responseScript: option.script // 记录后续对话
+                  };
+
+                  return {
+                      ...prev,
+                      quiz: [...otherLogs, { ...currentQuizLog, attempts: [...currentQuizLog.attempts, newAttempt] }]
+                  };
+              });
+
+              setScript(option.script);
+              setScriptIdx(0);
+              setIsTyping(true);
+              setLastQuizCorrect(option.correct);
+              setGameState('DEDUCTION_REACTION');
+          };
+
+          // 拖拽逻辑 (新版)
+  const handleDrop = (slotKey) => {
+            if (!draggedClue) return;
+            const logic = DEDUCTION_LOGIC[slotKey];
+            const isCorrect = logic.required.includes(draggedClue.id);
+            
+            // 记录推理板操作
+            if (performanceLog.dossier.startTime) {
+                 const timeOffset = (Date.now() - performanceLog.dossier.startTime) / 1000;
+                 setPerformanceLog(prev => ({
+                     ...prev,
+                     dossier: {
+                         ...prev.dossier,
+                         actions: [...prev.dossier.actions, {
+                             slotLabel: DOSSIER_SLOTS.find(s => s.key === slotKey)?.label,
+                             clueName: draggedClue.name,
+                             isCorrect,
+                             timeOffset
+                         }]
+                     }
+                 }));
+            }
+            
+            // 检查是否已经在槽里
+            if (slotState[slotKey].includes(draggedClue.id)) {
+                return;
+            }
+
+            // 检查是否匹配
+            if (isCorrect) {
+                const newSlotState = { ...slotState, [slotKey]: [...slotState[slotKey], draggedClue.id] };
+                setSlotState(newSlotState);
+                setDraggedClue(null);
+        setAiFeedback("");
+
+                // 检查是否全部完成
+                const allDone = DOSSIER_SLOTS.every(slot => {
+                    const req = DEDUCTION_LOGIC[slot.key].required;
+                    const current = newSlotState[slot.key]; // use new state
+                    return req.every(id => current.includes(id));
+                });
+                
+                if (allDone) {
+                    setTimeout(() => setIsPortraitRevealed(true), 1000);
+                }
+    } else {
+                setAiFeedback(`福尔摩斯：把"${draggedClue.name}"放在这里？逻辑完全不通。`);
+    }
+  };
+
+  const generateFinalReport = async () => {
+    setIsAiLoading(true);
+            
+            // 构建详细的性能报告字符串
+            let reportStr = "";
+            
+            // 1. 物品搜证部分
+            const scrutinyTime = performanceLog.scrutiny.endTime && performanceLog.scrutiny.startTime 
+                ? ((performanceLog.scrutiny.endTime - performanceLog.scrutiny.startTime) / 1000).toFixed(1) 
+                : "未知";
+            reportStr += `【物品搜证部分】\n耗时：${scrutinyTime}秒\n\n`;
+
+            // 2. 证物观察部分 (按顺序整理)
+            reportStr += `【证物观察部分】\n`;
+            // 对 quiz 数组按照 id 排序，确保顺序
+            const sortedQuizLog = [...performanceLog.quiz].sort((a, b) => HAT_QUIZ_ORDER.indexOf(a.id) - HAT_QUIZ_ORDER.indexOf(b.id));
+            
+            sortedQuizLog.forEach((q, idx) => {
+                reportStr += `问题${idx + 1}:\n`;
+                q.attempts.forEach((attempt, attIdx) => {
+                    const resultStr = attempt.isCorrect ? "正确" : "错误";
+                    const attTime = attempt.timeTaken.toFixed(1);
+                    const isFirst = attIdx === 0 ? "第一次" : `第${attIdx + 1}次`;
+                    
+                    reportStr += `${isFirst}回答${resultStr} 耗时：${attTime}秒\n`;
+                    reportStr += `福尔摩斯提问：${q.question}\n`;
+                    reportStr += `玩家选择：${attempt.optionText}\n`;
+                    
+                    // 记录后续对话
+                    if (attempt.responseScript && attempt.responseScript.length > 0) {
+                        attempt.responseScript.forEach(line => {
+                            reportStr += `"${line.speaker}", "${line.text}"\n`;
+                        });
+                    }
+                    reportStr += "\n";
+                });
+            });
+
+            console.log("最终玩家表现数据报告：\n", reportStr);
+
+            try {
+                console.log("正在请求 Dify Workflow...");
+                
+                const response = await fetch(`${DIFY_BASE_URL}/workflows/run`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${DIFY_API_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        inputs: { user_gamePerformance: reportStr },
+                        response_mode: "blocking",
+                        user: "player-act1"
+                    })
+                });
+
+                if (!response.ok) {
+                    const errText = await response.text();
+                    console.error("Dify API 请求失败:", response.status, errText);
+                    throw new Error(`API Error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log("Dify 返回原始数据:", data);
+
+                const outputs = data.data.outputs;
+                let result = null;
+
+                if (outputs) {
+                    // 尝试解析 outputs 中的 JSON 字符串或直接使用对象
+                    for (const key in outputs) {
+                        if (typeof outputs[key] === 'string') {
+                            try {
+                                const jsonMatch = outputs[key].match(/\{[\s\S]*\}/);
+                                const jsonStr = jsonMatch ? jsonMatch[0] : outputs[key];
+                                const parsed = JSON.parse(jsonStr);
+                                if (parsed.initial_dialogue && parsed.options) {
+                                    result = parsed;
+                                    break;
+                                }
+                            } catch (e) {}
+                        } else if (typeof outputs[key] === 'object') {
+                            if (outputs[key].initial_dialogue && outputs[key].options) {
+                                result = outputs[key];
+                                break;
+                            }
+                        }
+                    }
+                    if (!result && outputs.initial_dialogue) {
+                        result = outputs;
+                    }
+                }
+                
+                if (!result) throw new Error("无法解析 Dify 返回的数据");
+                
+                setDetectiveReport(result);
+    } catch(e) { 
+                console.error(e);
+                setDetectiveReport({
+                    initial_dialogue: [{ speaker: "福尔摩斯", content: "连接似乎有些不稳定，但我看到了你的努力。" }],
+                    options: []
+                }); 
+    } finally { setIsAiLoading(false); }
+  };
+
+              // --- 3D 渲染逻辑 (修复点击 & 增加遮挡检测) ---
+  const initThreeScene = (mount, type) => {
+    if (!mount) return;
+            // 清理旧的 canvas
+            while(mount.firstChild) mount.removeChild(mount.firstChild);
+
+    const scriptTag = document.createElement('script');
+    scriptTag.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+    scriptTag.onload = () => {
+      const THREE = window.THREE;
+      let scene = new THREE.Scene();
+      let camera = new THREE.PerspectiveCamera(45, mount.clientWidth / mount.clientHeight, 0.1, 1000);
+      let renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(mount.clientWidth, mount.clientHeight);
+      mount.appendChild(renderer.domElement);
+
+              // 区分光照
+              if (type === 'goose') {
+                  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+                  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                  directionalLight.position.set(5, 10, 5);
+                  scene.add(directionalLight);
+              } else {
+                  // 帽子场景的新光照
+                  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+                  const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                  mainLight.position.set(5, 10, 7);
+                  scene.add(mainLight);
+                  const bottomLight = new THREE.PointLight(0xd4a373, 0.5); 
+                  bottomLight.position.set(0, -3, 0);
+                  scene.add(bottomLight);
+              }
+      
+      let group = new THREE.Group();
+              let collisionObjects = []; // 用于遮挡检测的物体列表
+
+      if (type === 'goose') {
+                const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+                const orangeMat = new THREE.MeshStandardMaterial({ color: 0xff8c00, roughness: 0.3 });
+                const blackMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+
+                // 1. 身体 (稍微缩小)
+                const body = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), whiteMat);
+                body.scale.set(0.62, 0.58, 0.82); 
+                group.add(body); collisionObjects.push(body);
+
+                // 2. 脖子与头部组合
+                const neckGroup = new THREE.Group();
+                neckGroup.position.set(0, 0.35, 0.15); 
+                neckGroup.rotation.x = -0.2; 
+                group.add(neckGroup);
+
+                // 脖子
+                const neckHeight = 0.7;
+                const neckGeom = new THREE.CylinderGeometry(0.12, 0.2, neckHeight, 24);
+                const neckMesh = new THREE.Mesh(neckGeom, whiteMat);
+                neckMesh.position.y = neckHeight / 2; 
+                neckGroup.add(neckMesh); collisionObjects.push(neckMesh);
+
+                // 头部
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 24, 24), whiteMat);
+                head.position.y = neckHeight; 
+                neckGroup.add(head); collisionObjects.push(head);
+
+                // 喙
+                const beak = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.38, 16), orangeMat);
+                beak.position.set(0, -0.05, 0.28); 
+                beak.rotation.x = Math.PI / 2;
+                head.add(beak); collisionObjects.push(beak);
+
+                // 眼睛
+                const eyeGeom = new THREE.SphereGeometry(0.028, 8, 8);
+                const eyeL = new THREE.Mesh(eyeGeom, blackMat);
+                eyeL.position.set(0.15, 0.05, 0.08);
+                head.add(eyeL);
+                const eyeR = new THREE.Mesh(eyeGeom, blackMat);
+                eyeR.position.set(-0.15, 0.05, 0.08);
+                head.add(eyeR);
+
+                // 3. 腿部
+                const legGeom = new THREE.CylinderGeometry(0.045, 0.045, 0.8, 12);
+                const legR = new THREE.Mesh(legGeom, orangeMat);
+                legR.position.set(0.22, -0.55, 0.08);
+                group.add(legR); collisionObjects.push(legR);
+
+                const legL = new THREE.Mesh(legGeom, orangeMat);
+                legL.position.set(-0.22, -0.55, 0.08);
+                group.add(legL); collisionObjects.push(legL);
+
+                // 4. 右腿绳子与卡片
+                const rope = new THREE.Mesh(new THREE.TorusGeometry(0.065, 0.012, 8, 20), new THREE.MeshStandardMaterial({ color: 0x664422 }));
+                rope.position.copy(legR.position);
+                rope.rotation.x = Math.PI / 2;
+                group.add(rope);
+
+                const cardGroup = new THREE.Group();
+                cardGroup.position.set(0.22, -0.8, 0.18); 
+                cardGroup.rotation.y = 0.4;
+                group.add(cardGroup);
+
+                const card = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.28, 0.01), new THREE.MeshStandardMaterial({ color: 0xffffcc }));
+                cardGroup.add(card); collisionObjects.push(card);
+
+      } else {
+                // --- 新的帽子模型 ---
+                const feltMat = new THREE.MeshStandardMaterial({ 
+                    color: 0x3d2b1f, 
+                    roughness: 1.0, 
+                    metalness: 0.0,
+                    side: THREE.DoubleSide 
+                });
+                
+                // 1. 帽檐
+                const brimShape = new THREE.Shape();
+                brimShape.absarc(0, 0, 1.25, 0, Math.PI * 2, false);
+                const holePath = new THREE.Path();
+                holePath.absarc(0, 0, 0.72, 0, Math.PI * 2, true);
+                brimShape.holes.push(holePath);
+                const extrudeSettings = { depth: 0.06, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02 };
+                const brim = new THREE.Mesh(new THREE.ExtrudeGeometry(brimShape, extrudeSettings), feltMat);
+                brim.rotation.x = Math.PI / 2;
+                brim.position.y = 0.03;
+                group.add(brim); collisionObjects.push(brim);
+
+                // 2. 帽冠
+                const crownGeom = new THREE.CylinderGeometry(0.7, 0.75, 1, 40, 1, true);
+                const crown = new THREE.Mesh(crownGeom, feltMat);
+                crown.position.y = 0.5;
+                group.add(crown); collisionObjects.push(crown);
+
+                // 3. 帽顶
+                const topGeom = new THREE.SphereGeometry(0.7, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2);
+                const top = new THREE.Mesh(topGeom, feltMat);
+                top.position.y = 1;
+                top.scale.set(1, 0.2, 1);
+                group.add(top); collisionObjects.push(top);
+
+                // 4. 红棕色丝带
+                const ribbonMat = new THREE.MeshStandardMaterial({ color: 0x7a3a2a, roughness: 0.6, side: THREE.DoubleSide });
+                const ribbon = new THREE.Mesh(new THREE.CylinderGeometry(0.77, 0.77, 0.25, 40, 1, true), ribbonMat);
+                ribbon.position.y = 0.16;
+                group.add(ribbon); collisionObjects.push(ribbon);
+
+                // 5. 蜡滴
+                const waxMat = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.2 });
+                for(let i=0; i<3; i++) {
+                    const drop = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), waxMat);
+                    drop.position.set(-0.2 + i*0.06, 1.04, 0.1);
+                    drop.scale.y = 0.4;
+                    group.add(drop);
+                }
+
+                // 6. 金属扣
+                const metalMat = new THREE.MeshStandardMaterial({ color: 0x999999, metalness: 1, roughness: 0.3 });
+                const buckle = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.01, 8, 16), metalMat);
+                buckle.position.set(0.78, 0.05, 0);
+                buckle.rotation.y = Math.PI / 2;
+                group.add(buckle);
+      }
+      scene.add(group); camera.position.z = 5;
+
+      // 绘制新的 icon (带问号的圆圈)
+      const drawIcon = (color, isHat) => {
+let cv = document.createElement('canvas'); cv.width=64; cv.height=64;
+        let ctx = cv.getContext('2d');
+        
+        ctx.beginPath(); 
+        ctx.arc(32,32,26,0,Math.PI*2);
+        
+        if (isHat) {
+            // 新样式: #d4a373, 白色边框, 黑色问号
+            ctx.fillStyle = 'rgba(212, 163, 115, 0.9)';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 36px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('?', 32, 34);
+        } else {
+            // 鹅的样式: #ffa500 (orange), 白色边框, 黑色感叹号
+            ctx.fillStyle = 'rgba(255, 165, 0, 0.9)';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 36px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('!', 32, 34);
+        }
+return new THREE.CanvasTexture(cv);
+      };
+      
+      let sTexGoose = drawIcon(null, false);
+      let sTexHat = drawIcon(null, true);
+      let cTex = drawIcon('#22c55e', false); // 完成状态 (通用绿色)
+
+let sprites = {};
+const addMarker = (pos, id) => {
+        let sTex = type === 'hat' ? sTexHat : sTexGoose;
+        let sm = new THREE.SpriteMaterial({ map: sTex, depthTest: false, depthWrite: false }); // 确保不被深度遮挡剔除，而是通过逻辑判断透明度
+        let s = new THREE.Sprite(sm); s.position.copy(pos); 
+        // 缩小帽子线索点
+        if (type === 'hat') {
+            s.scale.set(0.3, 0.3, 0.3); // 缩小
+        } else {
+            s.scale.set(0.5, 0.5, 0.5); // 鹅的线索点大小
+        }
+        s.userData = { id, originalPos: pos.clone() };
+group.add(s); sprites[id] = s;
+      };
+
+if (type === 'goose') {
+        addMarker(new THREE.Vector3(0.25, -0.7, 0.1), 'goose_tag'); // 调整后的鹅腿位置
+} else {
+        // 新的坐标点
+        addMarker(new THREE.Vector3(0, 0.15, 0.8), 'ribbon'); 
+        addMarker(new THREE.Vector3(0.4, 0.7, 0.4), 'lining'); 
+        addMarker(new THREE.Vector3(0.78, 0.05, 0), 'strap'); 
+        addMarker(new THREE.Vector3(-0.6, -0.05, 0.3), 'edge'); 
+        addMarker(new THREE.Vector3(-0.2, 1.05, 0.1), 'top_wax'); 
+        addMarker(new THREE.Vector3(0, 0.2, -0.2), 'hair');
+}
+
+let isD = false, pM = {x:0, y:0};
+let autoRotate = true; // 初始自动旋转
+const onD = (e) => { isD = true; autoRotate = false; pM = { x: e.clientX, y: e.clientY }; };
+const onM = (e) => { if(!isD) return; group.rotation.y += (e.clientX-pM.x)*0.01; group.rotation.x += (e.clientY-pM.y)*0.01; pM = { x: e.clientX, y: e.clientY }; };
+      
+      // Raycaster 用于遮挡检测
+      const raycaster = new THREE.Raycaster();
+
+      const checkOcclusion = (sprite) => {
+          // 计算 Sprite 在世界坐标系中的位置
+          const spriteWorldPos = new THREE.Vector3();
+          sprite.getWorldPosition(spriteWorldPos);
+
+          // 射线方向：从相机指向 Sprite
+          const direction = spriteWorldPos.clone().sub(camera.position).normalize();
+          
+          // 设置射线：起点为相机位置
+          raycaster.set(camera.position, direction);
+
+          // 检测射线与模型物体的碰撞 (不包括 Sprite 自身)
+          // 注意：collisionObjects 需要包含所有可能遮挡视线的 Mesh
+          const intersects = raycaster.intersectObjects(collisionObjects, true);
+
+          if (intersects.length > 0) {
+              // 如果最近的交点距离比到 Sprite 的距离近，说明被遮挡
+              const distToSprite = camera.position.distanceTo(spriteWorldPos);
+              if (intersects[0].distance < distToSprite - 0.1) { // 0.1 是容差
+                  return true; // 被遮挡
+              }
+          }
+          return false; // 未被遮挡
+      };
+
+const onU = (e) => {
+if(!isD) return; isD=false;
+let rect = renderer.domElement.getBoundingClientRect();
+let mouse = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+        
+        // 点击检测也使用 Raycaster
+        raycaster.setFromCamera(mouse, camera);
+        let hits = raycaster.intersectObjects(Object.values(sprites), false); // 只检测 Sprite
+        
+        if (hits.length > 0) {
+            const sprite = hits[0].object;
+            // 再次进行遮挡检测，确保点击时没有被遮挡
+            if (!checkOcclusion(sprite)) {
+               const id = sprite.userData.id;
+   setFoundClueIds(prev => [...new Set([...prev, id])]);
+   setSelectedClue(RAW_CLUES.find(c => c.id === id));
+            } else {
+                console.log("Clue occluded!");
+            }
+}
+};
+
+// 触摸事件支持 (Touch Events)
+const onTouchStart = (e) => {
+    if (e.touches.length > 0) {
+        isD = true;
+        autoRotate = false;
+        pM = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        // e.preventDefault(); // 视情况是否需要阻止默认滚动
+    }
+};
+
+const onTouchMove = (e) => {
+    if (!isD || e.touches.length === 0) return;
+    const touch = e.touches[0];
+    group.rotation.y += (touch.clientX - pM.x) * 0.01;
+    group.rotation.x += (touch.clientY - pM.y) * 0.01;
+    pM = { x: touch.clientX, y: touch.clientY };
+    // e.preventDefault();
+};
+
+const onTouchEnd = (e) => {
+    if (!isD) return;
+    isD = false;
+    // 简单的触摸点击检测逻辑 (这里简化处理，实际可能需要判断是否移动过)
+    // 如果没有大幅移动，才视为点击
+    // 为了简单起见，这里复用鼠标的 raycaster 逻辑，但需要转换 touch 坐标
+    // 由于 touchEnd 没有 clientX/Y，通常建议在 touchStart 记录位置，或者直接依赖 react 的 onClick 如果不冲突
+    // 这里暂时只处理旋转结束
+};
+
+// 绑定触摸事件
+renderer.domElement.addEventListener('touchstart', onTouchStart, {passive: false});
+renderer.domElement.addEventListener('touchmove', onTouchMove, {passive: false});
+renderer.domElement.addEventListener('touchend', onTouchEnd);
+
+renderer.domElement.addEventListener('mousedown', onD);
+window.addEventListener('mousemove', onM);
+window.addEventListener('mouseup', onU);
+      
+      let fId; 
+      const anim = () => { 
+          fId = requestAnimationFrame(anim); 
+          
+          // 自动旋转效果
+          if (autoRotate) {
+              group.rotation.y += 0.005; // 缓慢自转
+          }
+
+          // 实时更新遮挡状态：改变透明度
+          Object.keys(sprites).forEach(id => { 
+              const s = sprites[id];
+              const isOccluded = checkOcclusion(s);
+              
+              // 如果已发现，显示完成状态；如果被遮挡，半透明；否则高亮
+              if(foundClueIdsRef.current.includes(id)) {
+                  s.material.map = cTex;
+                  s.material.opacity = isOccluded ? 0.2 : 1; 
+              } else {
+                  s.material.opacity = isOccluded ? 0.1 : 0.9; 
+              }
+              
+              // 被遮挡时禁用交互提示 (可选: 缩放)
+              s.scale.setScalar(isOccluded ? (type === 'hat' ? 0.2 : 0.4) : (type === 'hat' ? 0.35 : 0.55)); // 稍微动态缩放
+          }); 
+          
+          renderer.render(scene, camera); 
+      };
+anim();
+return () => { 
+    cancelAnimationFrame(fId); 
+    renderer.domElement.removeEventListener('mousedown', onD); 
+    renderer.domElement.removeEventListener('touchstart', onTouchStart);
+    renderer.domElement.removeEventListener('touchmove', onTouchMove);
+    renderer.domElement.removeEventListener('touchend', onTouchEnd);
+    if(mount) mount.removeChild(renderer.domElement); 
+};
+    };
+    document.head.appendChild(scriptTag);
+  };
+
+  useEffect(() => { if (gameState === 'GOOSE_SEARCH') initThreeScene(mountRefGoose.current, 'goose'); }, [gameState]);
+  useEffect(() => { if (gameState === 'SCRUTINY') initThreeScene(mountRefHat.current, 'hat'); }, [gameState]);
+
+  const curLine = script[scriptIdx] || {};
+          
+          useEffect(() => {
+              // 停止之前的音频
+              if (audioRef.current) {
+                  audioRef.current.pause();
+                  audioRef.current = null;
+              }
+              // 如果当前行有音频，则播放
+              if (curLine.audio) {
+                  const audio = new Audio(curLine.audio);
+                  audioRef.current = audio;
+                  audio.play().catch(e => console.log("Audio play failed:", e));
+              }
+          }, [curLine]);
+
+          const currentQuiz = DEDUCTION_SCRIPTS[HAT_QUIZ_ORDER[quizIdx]];
+
+  return (
+    <div className={`flex flex-col h-screen bg-[#FDFBF7] text-[#433D35] font-serif max-w-md mx-auto relative overflow-hidden shadow-2xl border-x-4 border-[#E8E2D6] ${isShaking ? 'animate-shake' : ''}`}>
+              <audio ref={bgmRef} src={ASSETS.BGM} loop />
+              
+              {/* BGM 开关 */}
+              <button 
+                onClick={() => setIsBgmPlaying(!isBgmPlaying)} 
+                className="absolute top-4 left-4 z-[60] bg-white/90 p-2 rounded-full shadow-lg border border-slate-200 text-slate-600 active:scale-95 transition-all"
+              >
+                {isBgmPlaying ? <span className="animate-spin-slow inline-block">🎵</span> : <span className="opacity-50">🔇</span>}
+              </button>
+
+      <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/paper-fibers.png')] z-50" />
+
+      {/* 笔记本 */}
+      <button onClick={() => setIsNotebookOpen(true)} className="absolute top-4 right-4 z-[60] bg-white/90 p-2 rounded-xl shadow-lg border border-slate-200 text-indigo-600 active:scale-95 transition-all">
+         <Book size={24} />
+         {foundClueIds.length > 0 && <span className="absolute -top-1 -right-1 bg-red-500 w-3 h-3 rounded-full animate-ping" />}
+      </button>
+
+              {/* --- SCENE: INTRO (Detective Desk & Case File) --- */}
+      {gameState === 'INTRO' && (
+                <div className="flex flex-col h-full bg-[#1a1510] relative overflow-hidden animate-in fade-in duration-1000">
+                  {/* 氛围背景：深色木纹 + 煤气灯光效 */}
+                  <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')] opacity-40"></div>
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(255,200,100,0.15),rgba(0,0,0,0.8))] pointer-events-none"></div>
+                  
+                  {/* 悬浮尘埃 */}
+                  <div className="absolute inset-0 opacity-30 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] animate-pulse"></div>
+
+                  {/* 桌面内容容器 */}
+                  <div className="relative z-10 flex flex-col items-center justify-center h-full p-6 perspective-1000">
+                    
+                    {/* 案卷主体：档案袋/纸张风格 */}
+                    <div className="w-full max-w-sm bg-[#f0e6d2] shadow-[0_30px_60px_rgba(0,0,0,0.6)] border border-[#d4c5a9] relative p-6 animate-paper-slide origin-bottom">
+                       
+                       {/* 纸张纹理叠加 */}
+                       <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/paper-fibers.png')]"></div>
+                       
+                       {/* 顶部装饰：回形针 */}
+                       <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-slate-400 drop-shadow-md z-20 animate-in slide-in-from-top duration-700 delay-500 fill-mode-backwards">
+                          <Paperclip size={40} className="rotate-45" strokeWidth={1.5} />
+                       </div>
+
+                       {/* 报纸剪报区域 (The Times) */}
+                       <div className="border-b-2 border-slate-800 pb-4 mb-5 text-center relative animate-fade-up" style={{ animationDelay: '500ms' }}>
+                         <h1 className="font-serif text-3xl font-black text-slate-900 mb-1 tracking-tighter uppercase scale-y-110">The Times</h1>
+                         <div className="text-[10px] text-slate-600 font-serif border-y border-slate-400 py-1 mb-4 flex justify-between tracking-widest">
+                           <span>DEC 26, 1889</span>
+                           <span>LONDON</span>
+                           <span>PRICE 3d</span>
+                         </div>
+                         <h2 className="font-serif text-2xl font-black text-slate-900 leading-none mb-3 uppercase">Blue Carbuncle<br/>Stolen!</h2>
+                         <div className="flex gap-3 text-left">
+                            <div className="flex-1 font-serif text-[10px] text-slate-700 text-justify leading-tight columns-2 gap-3 border-r border-slate-300 pr-3">
+                              <span className="font-bold">LONDON.</span> The Countess of Morcar's priceless blue gem has vanished from the Hotel Cosmopolitan. Police have arrested John Horner, a plumber, but the stone remains missing.
+                            </div>
+                         </div>
+                       </div>
+
+                       {/* 红色印章 (Absolute) */}
+                       <div className="absolute top-24 right-4 border-4 border-red-800 text-red-800 font-black text-[10px] px-2 py-1 rounded select-none pointer-events-none mix-blend-multiply animate-stamp z-20">
+                         TOP SECRET
+                       </div>
+
+                       {/* 福尔摩斯的便签 (Post-it style) */}
+                       <div className="bg-[#fff9c4] p-4 shadow-md mb-6 relative border border-yellow-200/50 animate-pop-in z-30">
+                         {/* 图钉 */}
+                         <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-red-500 rounded-full shadow-inner border border-red-700 z-10"></div>
+                         <div className="font-serif text-slate-800 text-sm leading-relaxed relative z-0">
+                           <p className="mb-2 text-[11px] text-slate-500 uppercase tracking-wider border-b border-slate-300/50 pb-1">To: Baker St. Irregular Leader</p>
+                           <p className="italic text-slate-900 mb-2">
+                             "当所有不可能被一一剔除，剩下的可能即便再离奇，也必然是唯一的真相。"
+                           </p>
+                           <p className="text-[11px]">
+                             速来贝克街221B。带上你的脑子，我们需要你敏锐的观察力。
+                           </p>
+                           <p className="text-right font-black text-slate-900 mt-2 text-xs font-serif">— S.H.</p>
+                         </div>
+                       </div>
+
+                       {/* 底部行动区：接受任务 */}
+                       <div className="mt-2 text-center animate-fade-up" style={{ animationDelay: '2000ms' }}>
+                          <p className="text-[9px] text-slate-500 mb-3 uppercase tracking-[0.2em]">— case file: 001 —</p>
+                          <button 
+                            onClick={() => {
+                                setGameState('ACT1_DIALOGUE');
+                                // 如果 BGM 处于开启状态但未播放（例如被自动播放策略拦截），则在此处尝试播放
+                                if (isBgmPlaying && bgmRef.current) {
+                                    bgmRef.current.play().catch(e => console.log("Resuming BGM failed", e));
+                                }
+                            }} 
+                            className="group w-full bg-[#2a1f16] text-[#f0e6d2] py-4 rounded shadow-xl hover:bg-black transition-all active:scale-[0.98] relative overflow-hidden"
+                          >
+                             <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                             <span className="font-serif font-bold text-sm uppercase tracking-[0.3em] flex items-center justify-center gap-3">
+                                <Search size={14} /> 开始调查
+                             </span>
+                          </button>
+                       </div>
+
+                    </div>
+                  </div>
+        </div>
+      )}
+
+              {/* --- SCENE: DIALOGUE (Common for Act1, Goose Quiz, and Deduction Reaction, and Act 1 Climax) --- */}
+              {(gameState === 'ACT1_DIALOGUE' || gameState === 'DEDUCTION_REACTION' || gameState === 'ACT1_CLIMAX') && (
+                <div className="flex flex-col h-full bg-[#1a1a1c] relative animate-in fade-in" onClick={() => !curLine.isGemMoment && !curLine.popupInfo && handleNextLine()}>
+                   <div className="absolute inset-0 z-0">
+                       <img 
+                           src={gameState === 'ACT1_CLIMAX' ? ASSETS.BG_221B : (gameState === 'DEDUCTION_REACTION' ? ASSETS.BG_DEDUCTION : ASSETS.BG_221B)} 
+                           className={`w-full h-full object-cover blur-[1px] transition-opacity duration-1000 ${gameState === 'DEDUCTION_REACTION' ? 'opacity-80' : 'opacity-90'}`} 
+                           alt="bg" 
+                       />
+                       {/* 移除白色渐变，改为深色氛围遮罩 */}
+                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                   </div>
+                   <div className="absolute inset-0 z-10 flex items-end justify-center pointer-events-none">{curLine.char && <img key={curLine.char} src={ASSETS[curLine.char]} className="h-[130%] object-contain drop-shadow-2xl animate-in slide-in-from-bottom duration-700 translate-y-[15%]" alt="tachie" />}</div>
+                   
+                   {/* 物品展示弹窗 (通用版) */}
+                   {(curLine.isGemMoment || curLine.popupInfo) && (
+                     <div className="absolute inset-0 z-[100] flex items-center justify-center p-8 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={(e) => { e.stopPropagation(); handleNextLine(); }}>
+                        <div className="bg-white p-4 pb-8 rounded-lg shadow-2xl rotate-[-1deg] max-w-xs animate-in zoom-in relative" onClick={(e) => e.stopPropagation()}>
+                           <div className="relative">
+                               <img 
+                                   src={curLine.popupInfo ? ASSETS[curLine.popupInfo.key] : ASSETS.GEM} 
+                                   className="w-full h-64 object-contain bg-black/5 rounded mb-4 p-4" 
+                                   alt="clue" 
+                               />
+                               <button onClick={(e) => { e.stopPropagation(); handleNextLine(); }} className="absolute -top-2 -right-2 bg-red-50 text-red-500 p-1 rounded-full"><X size={16}/></button>
+                           </div>
+                           <h3 className="text-xl font-black text-slate-900 mb-2 text-center">{curLine.popupInfo ? curLine.popupInfo.title : "莫尔卡伯爵夫人的蓝宝石"}</h3>
+                           <p className="text-[13px] text-slate-600 leading-relaxed italic border-t pt-3 font-serif text-center">
+                               {curLine.popupInfo ? curLine.popupInfo.desc : "“一颗比蚕豆略小、却光华璀璨的蓝色石头，仿佛凝聚了所有的星光。”"}
+                           </p>
+                        </div>
+                     </div>
+                   )}
+
+                   <div className="absolute top-[52%] left-4 right-4 z-20">
+              <div className="bg-white/95 backdrop-blur-md border-2 border-[#D1C7B7] rounded-3xl shadow-2xl p-6 min-h-[140px] relative">
+                 {curLine.speaker && curLine.speaker !== "旁白" && <div className="absolute -top-4 left-6 bg-indigo-600 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md border-2 border-white">{String(curLine.speaker)}</div>}
+                 <div className={`text-[15px] leading-relaxed italic ${curLine.speaker === "旁白" ? 'text-slate-400 text-center' : 'text-[#2a1f16]'}`}><Typewriter text={String(curLine.text || "")} onComplete={() => setIsTyping(false)} /></div>
+                 {!isTyping && <div className="absolute bottom-4 right-6 text-indigo-400 animate-bounce"><ArrowRight size={18} /></div>}
+                 
+                 {/* 历史对话按钮 */}
+                 <button 
+                    onClick={(e) => { e.stopPropagation(); setShowHistory(true); }} 
+                    className="absolute -bottom-8 left-0 flex items-center gap-1 text-xs text-white/50 hover:text-white transition-colors"
+                 >
+                    <History size={14}/> 历史对话
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* --- SCENE: GOOSE_SEARCH --- */}
+      {gameState === 'GOOSE_SEARCH' && (
+        <div className="flex flex-col h-full bg-[#0f0f11] relative animate-in zoom-in">
+            <header className="p-4 bg-white/5 border-b border-white/10 flex justify-between items-center text-white z-20"><h2 className="text-[10px] font-black uppercase tracking-widest">3D 搜证：圣诞肥鹅</h2><div className="text-[10px] text-indigo-400 font-bold animate-pulse">翻转寻找鹅腿上的卡片</div></header>
+            <div ref={mountRefGoose} className="flex-1 relative cursor-move" />
+            
+            {/* 新手引导覆盖层 */}
+            {foundClueIds.length === 0 && (
+                <div className="absolute inset-0 pointer-events-none z-30 flex flex-col items-center justify-center animate-fade-out-delay">
+                    <div className="bg-black/60 backdrop-blur-sm px-6 py-3 rounded-full border border-white/20 shadow-xl flex items-center gap-4 animate-bounce">
+                        <span className="text-white font-black text-xs uppercase tracking-widest">
+                            <span className="bg-indigo-600 px-2 py-0.5 rounded-md mr-2">TIP</span>
+                            拖动屏幕旋转模型
+                        </span>
+                        <Move className="text-white animate-pulse" size={16} />
+                    </div>
+                    {/* 简单的 1-2-3 步骤指示 (视觉装饰) */}
+                    <div className="absolute bottom-24 flex gap-8 opacity-60">
+                        <div className="flex flex-col items-center gap-1">
+                            <div className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white">1</div>
+                            <span className="text-[9px] text-white uppercase tracking-widest">Rotate</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1">
+                            <div className="w-6 h-6 rounded-full border-2 border-white/50 flex items-center justify-center text-[10px] font-bold text-white/50">2</div>
+                            <span className="text-[9px] text-white/50 uppercase tracking-widest">Find</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1">
+                            <div className="w-6 h-6 rounded-full border-2 border-white/50 flex items-center justify-center text-[10px] font-bold text-white/50">3</div>
+                            <span className="text-[9px] text-white/50 uppercase tracking-widest">Click</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="p-6 bg-gradient-to-t from-black to-transparent z-10"><div className="bg-white/10 backdrop-blur p-4 rounded-xl text-center"><p className="text-xs text-indigo-200 italic">“帮彼得森看看那只鹅，能不能找到什么线索？”</p></div></div>
+        </div>
+      )}
+
+      {/* --- SCENE: GOOSE_QUIZ --- */}
+      {gameState === 'GOOSE_QUIZ' && (
+                <div className="flex flex-col h-full bg-[#1a1a1c] relative animate-in fade-in overflow-hidden">
+                    <div className="absolute inset-0 z-0">
+                       <img src={ASSETS.BG_DEDUCTION} className="w-full h-full object-cover opacity-80 blur-[2px]" alt="bg" />
+                       <div className="absolute inset-0 bg-black/60" />
+                    </div>
+            <div className="absolute inset-0 flex items-center justify-center p-6 z-50">
+               <div className="bg-white/95 backdrop-blur-xl p-8 rounded-[40px] shadow-2xl border-4 border-indigo-100 max-w-xs animate-in zoom-in">
+                  <h3 className="text-indigo-950 text-base font-black mb-8 leading-relaxed text-center">福尔摩斯：学徒，你的判断是？</h3>
+                  <div className="space-y-4">
+                     <button onClick={() => handleGooseQuizSelection(true)} className="w-full p-5 bg-indigo-50 border-2 border-indigo-100 rounded-2xl text-indigo-900 text-sm font-bold text-left active:bg-indigo-600 active:text-white transition-all shadow-sm">A. 卡片上写着名字，是准备送给妻子的礼物。</button>
+                     <button onClick={() => handleGooseQuizSelection(false)} className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-slate-500 text-sm font-bold text-left active:bg-red-500 active:text-white transition-all shadow-sm">B. 卡片上写着名字，是太太自己购买的。</button>
+                  </div>
+               </div>
+            </div>
+        </div>
+      )}
+
+      {/* --- SCENE: SCRUTINY (帽子 3D) --- */}
+      {gameState === 'SCRUTINY' && (
+        <div className="flex flex-col h-full bg-[#0f0f11] relative animate-in fade-in">
+                  <header className="p-4 bg-white/5 border-b border-white/10 flex justify-between items-center text-white z-20"><h2 className="text-[10px] font-black uppercase tracking-widest">3D 深度搜证：破旧帽子</h2><div className="bg-black/40 px-3 py-1 rounded-full border border-white/10 text-[10px] font-mono">{foundClueIds.filter(id => id !== 'goose_tag').length} / 6</div></header>
+          <div ref={mountRefHat} className="flex-1 relative cursor-move" />
+                  <div className="p-6 bg-gradient-to-t from-black to-transparent z-10"><button disabled={foundClueIds.filter(id => id !== 'goose_tag').length < 6} onClick={() => setGameState('HAT_DEDUCTION')} className={`w-full py-4 rounded-full font-black text-xs uppercase tracking-widest transition-all ${foundClueIds.length >= 7 ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-500/30' : 'bg-white/5 text-white/20'}`}>开始演绎推理</button></div>
+        </div>
+      )}
+
+      {/* --- SCENE: HAT_DEDUCTION --- */}
+              {gameState === 'HAT_DEDUCTION' && currentQuiz && (
+                <div className="flex flex-col h-full bg-[#1a1a1c] relative animate-in slide-in-from-bottom overflow-hidden">
+                    <div className="absolute inset-0 z-0">
+                       <img src={ASSETS.BG_DEDUCTION} className="w-full h-full object-cover opacity-80 blur-[2px]" alt="bg" />
+                       <div className="absolute inset-0 bg-black/60" />
+                    </div>
+                    <header className="relative z-10 p-6 bg-black/40 flex items-center gap-3 text-indigo-400"><Brain size={20}/><h2 className="text-xs font-black uppercase tracking-widest">侧写挑战 {quizIdx + 1}/3</h2></header>
+                    <div className="relative z-10 flex-1 p-6 flex flex-col justify-center">
+                        <div className="bg-indigo-900 border-2 border-indigo-700 p-8 rounded-[40px] shadow-2xl relative">
+                            <p className="text-white text-base font-bold leading-relaxed mb-8">{currentQuiz.question}</p>
+                            <div className="space-y-3">
+                                {currentQuiz.options.map((opt, i) => (
+                                    <button key={i} onClick={() => handleDeductionSelection(opt)} className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm text-left hover:bg-white/10 active:scale-95 transition-all">{opt.text}</button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+        </div>
+      )}
+
+      {/* --- SCENE: DOSSIER --- */}
+      {gameState === 'DOSSIER' && (
+        <div className="flex flex-col h-full bg-[#8B5A2B] relative animate-in slide-in-from-right overflow-hidden">
+          <div className="absolute inset-0 opacity-40 bg-[url('https://www.transparenttextures.com/patterns/cork-board.png')]" />
+          <header className="relative z-10 p-4 bg-white/95 shadow-md flex justify-between items-center"><h2 className="text-sm font-black flex items-center gap-2 text-slate-800"><Pin size={16} className="text-red-600"/> 思维工坊</h2></header>
+                  
+                  {/* 可拖拽线索池 */}
+                  <div className="relative z-10 p-4 bg-[#FDFBF7]/95 backdrop-blur border-b border-[#D1C7B7] shadow-xl">
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {foundClueIds.map(id => {
+                            // 检查该线索是否已经被放入所有需要的槽中
+                            // 1. 找出所有需要此线索的槽位 key
+                            const requiredSlots = Object.keys(DEDUCTION_LOGIC).filter(key => 
+                                DEDUCTION_LOGIC[key].required.includes(id)
+                            );
+                            
+                            // 2. 检查是否在这些槽位中都已经存在
+                            const isFullyUsed = requiredSlots.every(key => slotState[key].includes(id));
+                            
+                            // 如果该线索不属于任何逻辑（还没定义用途），也暂时显示（或者隐藏，取决于设计，这里选择显示以便调试）
+                            // 如果 requiredSlots 为空，说明是多余线索，或者逻辑未定义。我们假设都定义了。
+                            
+                            if (isFullyUsed && requiredSlots.length > 0) return null;
+                            
+                            const clue = RAW_CLUES.find(c => c.id === id);
+                            if (!clue) return null;
+
+                            return (
+                                <div key={id} draggable onDragStart={() => setDraggedClue(clue)} className="bg-yellow-100 px-3 py-2 rounded shadow-md text-[11px] font-black text-slate-800 rotate-1 border-b-2 border-yellow-300 cursor-grab active:scale-95">
+                                    {clue.name}
+        </div>
+                            );
+                        })}
+                      </div>
+                  </div>
+
+                  <div className="flex-1 relative z-10 p-4 overflow-y-auto custom-scrollbar space-y-4 pb-24">
+                      {DOSSIER_SLOTS.map(slot => {
+                          const logic = DEDUCTION_LOGIC[slot.key];
+                          const currentClues = slotState[slot.key];
+                          const isComplete = logic.required.every(id => currentClues.includes(id));
+
+                          return (
+                            <div key={slot.key} onDragOver={(e) => e.preventDefault()} onDrop={() => handleDrop(slot.key)} className={`relative bg-white p-4 shadow-xl border-b-4 transition-all rounded-xl ${isComplete ? 'border-green-400' : 'border-slate-300'}`}>
+                                <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-red-600 drop-shadow-md"><Pin fill="currentColor" size={20}/></div>
+                                
+                                <div className={`p-3 ${slot.color} border border-slate-200 min-h-[90px] flex flex-col items-center justify-center rounded-xl transition-all`}>
+                                    <div className="text-[10px] font-black text-slate-400 uppercase mb-2 flex items-center gap-1 tracking-widest">{slot.icon} {slot.label}</div>
+                                    
+                                    {/* 显示已放入的线索小图标/文字 */}
+                                    <div className="flex flex-wrap gap-1 justify-center mb-2">
+                                        {currentClues.map(cid => {
+                                            const c = RAW_CLUES.find(x => x.id === cid);
+                                            return <span key={cid} className="text-[9px] bg-white/60 px-2 py-1 rounded-full border border-black/10">{c?.name}</span>;
+                                        })}
+                                    </div>
+
+                                    {isComplete ? ( 
+                                      <div className="animate-in zoom-in duration-500 flex flex-col items-center">
+                                          <CheckCircle2 size={20} className="text-green-600 mb-1" />
+                                          <span className="text-[15px] font-black text-indigo-900 underline decoration-wavy decoration-indigo-300">{logic.title}</span> 
+                                      </div>
+                                    ) : ( 
+                                      <span className="text-[10px] text-slate-300 italic tracking-[0.2em]">等待线索拼凑... ({currentClues.length}/{logic.required.length})</span> 
+                                    )}
+                                </div>
+                            </div>
+                        );
+                      })}
+                  </div>
+
+                  {/* 最终画像 */}
+                  {isPortraitRevealed && (
+                      <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-1000">
+                          <div className="bg-[#FDFBF7] p-6 rounded-[2rem] shadow-2xl max-w-sm w-full text-center border-4 border-[#D1C7B7] relative overflow-hidden">
+                              <div className="absolute top-0 left-0 w-full h-2 bg-indigo-900" />
+                              <h3 className="text-2xl font-black text-indigo-950 mb-6 italic font-serif mt-2">失主侧写完成</h3>
+                              <div className="w-48 h-48 mx-auto bg-slate-200 rounded-full mb-6 border-4 border-indigo-100 overflow-hidden shadow-inner relative group">
+                                  <img src={ASSETS.CHAR_OWNER} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" alt="Owner" />
+                              </div>
+                              <p className="text-sm text-slate-600 italic leading-relaxed mb-6 font-serif">
+                                  “亨利·贝克，中年，家道中落但极力维持体面。妻子不再爱他，家中也无煤气灯，生活在一种缓慢的衰败之中。”
+                              </p>
+                              <button onClick={() => {
+                                  generateFinalReport(); // 后台生成报告
+                                  setGameState('ACT1_CLIMAX'); // 直接进入高潮剧情
+                                  setScript(ACT1_CLIMAX_SCRIPT);
+                                  setScriptIdx(0);
+                                  setIsTyping(true);
+                              }} disabled={isAiLoading} className="w-full py-4 rounded-xl bg-indigo-900 text-white font-black text-xs uppercase tracking-[0.3em] shadow-xl hover:bg-indigo-800 transition-all">
+                                  {isAiLoading ? "生成报告..." : "提交最终结论"}
+                              </button>
+                          </div>
+                      </div>
+                  )}
+
+                  {aiFeedback && <div className="absolute bottom-6 left-6 right-6 bg-red-50 p-4 rounded-xl text-center text-red-700 text-xs italic font-bold border border-red-100 shadow-xl animate-in slide-in-from-bottom">{String(aiFeedback)}</div>}
+                </div>
+              )}
+
+              {/* --- SCENE: REWARD (Pre-Climax) --- */}
+      {gameState === 'REWARD' && (
+                <div 
+                    className="flex flex-col h-full bg-white animate-in zoom-in overflow-hidden relative"
+                    onClick={(e) => {
+                        // 允许用户滚动，只有点击非交互区域才推进对话
+                        // 如果点击的是滚动条或者内容区域的空白处，推进对话
+                        // 但如果是拖动滚动，不应该推进。这里简化处理，点击即推进
+                        
+                        const initialLen = detectiveReport.initial_dialogue ? detectiveReport.initial_dialogue.length : 0;
+                        if (rewardDialogIndex < initialLen) {
+                            setRewardDialogIndex(i => i + 1);
+                        } else if (selectedRewardOption) {
+                            const responseLen = selectedRewardOption.response_dialogue ? selectedRewardOption.response_dialogue.length : 0;
+                            if (rewardResponseIndex < responseLen) {
+                                setRewardResponseIndex(i => i + 1);
+                            }
+                        }
+                    }}
+                >
+                   {/* 背景与装饰 */}
+                   <div className="absolute inset-0 bg-[#FDFBF7] opacity-100 z-0"></div>
+                   <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/paper-fibers.png')] z-0" />
+                   
+                   <header className="relative z-10 p-6 border-b border-[#E8E2D6] bg-white/50 backdrop-blur-md text-center shadow-sm flex-shrink-0">
+                      <h2 className="text-xl font-black italic text-slate-900 font-serif flex items-center justify-center gap-2">
+                          <MessageSquare size={20} className="text-indigo-900"/> 幕后小剧场
+                      </h2>
+                   </header>
+
+                   <div 
+                      className="flex-1 overflow-y-auto p-4 space-y-4 relative z-10 custom-scrollbar pb-32" 
+                      style={{WebkitOverflowScrolling: 'touch'}}
+                   >
+                      {/* 初始评价对话 (逐句展示) */}
+                      {detectiveReport.initial_dialogue && detectiveReport.initial_dialogue.slice(0, rewardDialogIndex).map((msg, idx) => (
+                          <div key={`init-${idx}`} className={`flex gap-3 ${msg.speaker === '我' ? 'flex-row-reverse' : ''} animate-in slide-in-from-bottom fade-in duration-500`}>
+                              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-slate-200 overflow-hidden border-2 border-white shadow-md">
+                                  <img 
+                                      src={msg.speaker.includes("福尔摩斯") ? ASSETS.CHAR_HOLMES : (msg.speaker.includes("华生") ? ASSETS.CHAR_WATSON : ASSETS.CHAR_PLAYER)} 
+                                      className="w-full h-full object-cover object-top scale-150 translate-y-2" 
+                                      alt={msg.speaker} 
+                                  />
+                              </div>
+                              <div className={`max-w-[80%] p-3 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                                  msg.speaker === '我' 
+                                  ? 'bg-indigo-600 text-white rounded-tr-none' 
+                                  : (msg.speaker.includes("福尔摩斯") ? 'bg-[#2a1f16] text-[#f0e6d2] rounded-tl-none' : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none')
+                              }`}>
+                                  <div className="text-[10px] opacity-70 mb-1 font-bold uppercase tracking-wider">{msg.speaker}</div>
+                                  {msg.content}
+                              </div>
+                          </div>
+                      ))}
+
+                      {/* 玩家选择后的回应 (逐句展示) */}
+                      {selectedRewardOption && selectedRewardOption.response_dialogue && selectedRewardOption.response_dialogue.slice(0, rewardResponseIndex).map((msg, idx) => (
+                          <div key={`resp-${idx}`} className={`flex gap-3 ${msg.speaker === '我' ? 'flex-row-reverse' : ''} animate-in slide-in-from-bottom fade-in duration-500`}>
+                              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-slate-200 overflow-hidden border-2 border-white shadow-md">
+                                  <img 
+                                      src={msg.speaker.includes("福尔摩斯") ? ASSETS.CHAR_HOLMES : (msg.speaker.includes("华生") ? ASSETS.CHAR_WATSON : ASSETS.CHAR_PLAYER)} 
+                                      className="w-full h-full object-cover object-top scale-150 translate-y-2" 
+                                      alt={msg.speaker} 
+                                  />
+                              </div>
+                              <div className={`max-w-[80%] p-3 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                                  msg.speaker === '我' 
+                                  ? 'bg-indigo-600 text-white rounded-tr-none' 
+                                  : (msg.speaker.includes("福尔摩斯") ? 'bg-[#2a1f16] text-[#f0e6d2] rounded-tl-none' : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none')
+                              }`}>
+                                  <div className="text-[10px] opacity-70 mb-1 font-bold uppercase tracking-wider">{msg.speaker}</div>
+                                  {msg.content}
+                              </div>
+                          </div>
+                      ))}
+                      
+                      {/* Problem Solved 按钮 (对话结束显示) */}
+                      {selectedRewardOption && rewardResponseIndex >= (selectedRewardOption.response_dialogue?.length || 0) && (
+                          <div className="py-8 text-center animate-in zoom-in duration-500 delay-500">
+                              <button 
+                                  onClick={(e) => { e.stopPropagation(); setGameState('ACT1_END'); }} 
+                                  className="px-8 py-3 bg-indigo-900 text-white text-xs font-black uppercase tracking-[0.3em] rounded-full shadow-xl hover:bg-indigo-800 transition-all hover:scale-105"
+                              >
+                                  PROBLEM SOLVED
+                              </button>
+                              <p className="text-[10px] text-slate-400 mt-3 tracking-widest uppercase">Proceed to Next Scene</p>
+                          </div>
+                      )}
+                      
+                      {/* 底部占位 */}
+                      <div className="h-4"></div>
+                   </div>
+
+                   {/* 底部选项区域 (初始对话展示完毕且未选择时显示) */}
+                   {rewardDialogIndex >= (detectiveReport.initial_dialogue?.length || 0) && !selectedRewardOption && detectiveReport.options && (
+                       <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-white via-white/95 to-transparent z-20">
+                           <div className="space-y-2">
+                               {detectiveReport.options.map(opt => (
+                                   <button 
+                                       key={opt.id}
+                                       onClick={(e) => { e.stopPropagation(); setSelectedRewardOption(opt); setRewardResponseIndex(1); }}
+                                       className="w-full p-3 bg-white border border-indigo-100 shadow-lg rounded-xl text-left text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:border-indigo-300 transition-all active:scale-[0.98] group"
+                                   >
+                                       <span className="inline-block w-5 h-5 bg-indigo-100 text-indigo-600 rounded-full text-center leading-5 mr-2 text-[10px] group-hover:bg-indigo-600 group-hover:text-white transition-colors">{opt.id}</span>
+                                       {opt.text}
+                                   </button>
+                               ))}
+                           </div>
+                       </div>
+                   )}
+                </div>
+              )}
+
+              {/* --- SCENE: ACT1_END (To Be Continued) --- */}
+              {gameState === 'ACT1_END' && (
+                <div className="flex flex-col h-full bg-black relative animate-in fade-in duration-1000">
+                    <img src={ASSETS.BG_END} className="absolute inset-0 w-full h-full object-cover opacity-90" alt="Chapter End" />
+                    <div className="relative z-10 flex flex-col h-full items-center justify-end p-8 pb-20 bg-gradient-to-t from-black via-transparent to-transparent space-y-4">
+                        <a href="./第二幕.html" className="px-10 py-4 bg-indigo-600 text-white font-black text-sm uppercase tracking-[0.3em] rounded-full shadow-[0_0_30px_rgba(79,70,229,0.5)] hover:bg-indigo-500 hover:scale-105 transition-all animate-bounce">进入第二章</a>
+                        <button onClick={() => window.location.reload()} className="px-8 py-3 border border-white/20 bg-black/40 backdrop-blur rounded-full text-white/80 text-xs uppercase tracking-[0.3em] hover:bg-white hover:text-black transition-all">重玩第一章</button>
+                    </div>
+        </div>
+      )}
+
+      {/* 详情弹窗 (拍立得) */}
+      {selectedClue && (
+        <div className="absolute inset-0 z-[100] flex items-center justify-center p-8 bg-black/60 backdrop-blur-sm animate-in fade-in">
+           <div className="bg-white p-4 pb-8 rounded-lg shadow-2xl rotate-[-1deg] max-w-xs animate-in zoom-in">
+              <div className="relative"><img src={selectedClue.imgUrl} className="w-full h-48 object-cover rounded mb-4" alt="clue" /><button onClick={() => setSelectedClue(null)} className="absolute -top-2 -right-2 bg-red-50 text-red-500 p-1 rounded-full"><X size={16}/></button></div>
+              <h3 className="text-lg font-black text-slate-900 mb-2">{String(selectedClue.name)}</h3>
+              <p className="text-[12px] text-slate-600 leading-relaxed italic border-t pt-3 font-serif">“{String(selectedClue.detail)}”</p>
+              {selectedClue.id === 'goose_tag' && ( <button onClick={() => { setSelectedClue(null); setGameState('ACT1_DIALOGUE'); setScript(GOOSE_QUIZ_SCRIPT); setScriptIdx(0); setIsTyping(true); }} className="w-full mt-6 py-3 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-full">告知福尔摩斯结论</button> )}
+           </div>
+        </div>
+      )}
+
+      {/* 全局笔记本 */}
+      {isNotebookOpen && (
+        <div className="absolute inset-0 z-[100] bg-[#FDFBF7] animate-in slide-in-from-top duration-500 flex flex-col p-6 overflow-hidden">
+           <header className="flex justify-between items-center mb-8 border-b-2 border-[#D1C7B7] pb-4"><div className="flex items-center gap-2 text-indigo-950 font-black italic"><ClipboardList size={24} /> 侦探手札</div><button onClick={() => setIsNotebookOpen(false)} className="p-2"><X size={20}/></button></header>
+           <div className="flex-1 overflow-y-auto no-scrollbar space-y-8">{foundClueIds.map(id => { const clue = RAW_CLUES.find(c => c.id === id); return clue ? (<div key={id} className="bg-white p-4 rounded-2xl shadow-lg border border-slate-100"><div className="flex gap-4"><img src={clue.imgUrl} className="w-20 h-20 object-cover rounded-lg" alt="clue" /><div className="flex-1"><h4 className="text-[14px] font-black">{String(clue.name)}</h4><p className="text-[11px] text-slate-500 italic mb-1">{String(clue.desc)}</p><p className="text-[11px] text-slate-700 leading-relaxed">{String(clue.detail)}</p></div></div></div>) : null; })}</div>
+        </div>
+      )}
+
+      {/* 历史对话弹窗 */}
+      {showHistory && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={() => setShowHistory(false)}>
+            <div className="w-[90%] h-[80%] bg-[#f4e4bc]/95 rounded-lg shadow-2xl overflow-hidden flex flex-col relative border-4 border-[#d4c5a9] p-6 max-w-lg" onClick={e => e.stopPropagation()}>
+                {/* 纹理遮罩 */}
+                <div className="absolute inset-0 opacity-30 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/paper-fibers.png')]"></div>
+                
+                <header className="flex justify-between items-center mb-6 border-b border-[#8b5a2b]/30 pb-4 relative z-10 flex-shrink-0">
+                    <h2 className="text-xl font-black italic text-[#433D35] font-serif flex items-center gap-2">
+                    <History size={24}/> 剧情回顾
+                    </h2>
+                    <button onClick={() => setShowHistory(false)} className="p-2 text-[#433D35] hover:bg-[#8b5a2b]/10 rounded-full transition-colors"><X size={24}/></button>
+                </header>
+
+                <div ref={historyScrollRef} className="flex-1 overflow-y-auto custom-scrollbar relative z-10 space-y-6 pr-2 pb-6" style={{WebkitOverflowScrolling: 'touch'}}>
+                    {historyLog.map((log, idx) => (
+                        <div key={idx} className="border-b border-[#8b5a2b]/10 pb-4 last:border-0 animate-in slide-in-from-left duration-300" style={{animationDelay: `${idx * 50}ms`}}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-black text-white bg-[#8b5a2b] px-2 py-0.5 rounded shadow-sm">{log.speaker}</span>
+                            </div>
+                            <p className="text-sm text-[#433D35] leading-relaxed font-serif pl-1">{log.text}</p>
+                        </div>
+                    ))}
+                    {historyLog.length === 0 && <div className="h-full flex items-center justify-center text-[#8b5a2b]/40 italic">暂无历史记录...</div>}
+                </div>
+            </div>
+        </div>
+      )}
+
+      <footer className="p-4 bg-[#1a1a1c] flex justify-between items-center text-white/30 border-t border-white/5 z-[70]">
+        <div className="text-[9px] font-black uppercase tracking-tighter">Baker St Lab · Blue Carbuncle 3D</div>
+        <Rotate3d size={14} className="animate-spin-slow" />
+      </footer>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 20px; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .animate-spin-slow { animation: spin-slow 12s linear infinite; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); } 20%, 40%, 60%, 80% { transform: translateX(10px); } }
+        .animate-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+                .text-shadow-lg { text-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+                
+                /* Intro Animations */
+                @keyframes stamp-drop {
+                  0% { transform: scale(3) rotate(15deg); opacity: 0; }
+                  50% { opacity: 1; }
+                  70% { transform: scale(0.9) rotate(-15deg); }
+                  100% { transform: scale(1) rotate(-15deg); opacity: 0.8; }
+                }
+                .animate-stamp { animation: stamp-drop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) 1.5s both; }
+
+                @keyframes pop-in {
+                  0% { transform: scale(0.5) translateY(-50px) rotate(10deg); opacity: 0; }
+                  100% { transform: scale(1) translateY(0) rotate(-2deg); opacity: 1; }
+                }
+                .animate-pop-in { animation: pop-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.8s both; }
+
+                @keyframes paper-slide {
+                  from { transform: translateY(120%) rotate(5deg); opacity: 0; }
+                  to { transform: translateY(0) rotate(1deg); opacity: 1; }
+                }
+                .animate-paper-slide { animation: paper-slide 1.2s cubic-bezier(0.23, 1, 0.32, 1) both; }
+                
+                @keyframes fade-up {
+                  from { transform: translateY(20px); opacity: 0; }
+                  to { transform: translateY(0); opacity: 1; }
+                }
+                .animate-fade-up { animation: fade-up 0.8s ease-out both; }
+
+                @keyframes fade-out-delay {
+                    0%, 80% { opacity: 1; }
+                    100% { opacity: 0; visibility: hidden; }
+                }
+                .animate-fade-out-delay { animation: fade-out-delay 4s forwards; pointer-events: none; }
+      `}</style>
+    </div>
+  );
+};
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

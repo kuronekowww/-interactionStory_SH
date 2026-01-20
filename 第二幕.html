@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蓝宝石案 - 第二幕</title>
+    
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 引入 Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- 配置模块映射 -->
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "lucide-react": "https://esm.sh/lucide-react@0.292.0"
+        }
+    }
+    </script>
+    
+    <style>
+        body { margin: 0; background-color: #f3f4f6; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 20px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+import React, { useState, useEffect, useRef } from 'react';
+import { createRoot } from 'react-dom/client';
+import { 
+  ArrowRight, Search, Pin, MessageSquare, 
+  Play, SkipForward, Send, Lightbulb,
+  AlertCircle, Loader2, Info
+} from 'lucide-react';
+
+// --- 系统配置 ---
+const DIFY_BASE_URL = "http://ops.pd.ximalaya.local/dify/v1";
+const DIFY_API_KEY = "app-Y9KhYsOSv3mYYicXVVj9qOVY";
+
+// --- 资源配置 ---
+const ASSETS = {
+    BG_221B: "./pic/scene/scene_livingroom.png",
+    BG_CLIMAX: "./pic/scene/scene4.png",
+    CHAR_HOLMES: "./pic/character/character_sherlock.png",
+    CHAR_WATSON: "./pic/character/character_waston.png",
+    CHAR_PLAYER: "./pic/character/character_player.png",
+    CHAR_PETERSON: "./pic/character/character_peterson.png",
+    BGM: "./voice/bgm/bgm1.mp3",
+};
+
+// --- 游戏核心配置与静态彩蛋文案 ---
+const GAME_CONFIG = {
+  // 侧边栏固定文案（彩蛋）
+  sidebars: {
+    easterEggs: [
+      { title: "【独家八卦】", content: "传华生医生即将大婚搬离贝克街。哈德森太太透露，二楼那位房客已连续三晚在窗前拉奏最为凄凉的小提琴曲，听者落泪。" },
+      { title: "【独家八卦】", content: "《海滨杂志》编辑部爆料：华生医生的新作被退稿。理由是“请增加案情推理比重，删减对侦探侧影及迷人眼神的过度描写”。" },
+      { title: "【警告！】", content: "敬告伦敦居民！若信封中倒出五枚干瘪橘核，切勿当作恶作剧！此乃必死通知。建议收信者立刻立遗嘱，因为连贝克街那位也未必能救你。" },
+      { title: "【独家八卦】", content: "莫里亚蒂教授豪掷千金购入名画，引发收入来源质疑。某侦探冷评：“仅靠那本无人问津的数学书，他恐怕连画框都买不起。”" },
+      { title: "【独家八卦】", content: "雷斯垂德与葛莱森争夺“最佳警探”头衔，互不相让。市民调侃：“省省吧，最后谁不是还得去贝克街的那间客厅求救？”" }
+    ],
+    ad: '广告：221B 贝克街尚有空房，限单身绅士。'
+  }
+};
+
+// --- 剧本数据 ---
+const ACT2_INTRO_SCRIPT_PART1 = [
+    { speaker: "旁白", text: "（彼得森还在大口喘气，福尔摩斯却突然静了下来。他用镊子夹起那颗蓝宝石，对着冬日的冷光转动，眼神中闪烁着猎食者的兴奋。）" },
+    { speaker: "福尔摩斯", text: "看这光芒，队长。不仅是诱人，简直是邪恶。这颗宝石出世才二十年，已经引发了两起谋杀案、一次泼硫酸毁容案。", char: "CHAR_HOLMES", audio: "./voice/chapter2/sherlock/看这光芒，队.m4a" },
+    { speaker: "福尔摩斯", text: "而现在，它出现在了最荒谬的地方—— 一只圣诞鹅的肚子里。", char: "CHAR_HOLMES", audio: "./voice/chapter2/sherlock/而现在，它出.m4a" },
+    { speaker: "我", text: "这东西怎么会……", char: "CHAR_PLAYER" },
+    { speaker: "旁白", text: "（华生将报纸推到我面前）", nextState: "TIMES_REVEAL" }
+];
+
+const ACT2_INTRO_SCRIPT_PART2 = [
+    { speaker: "我", text: "等等，我有点糊涂了……种种证据表明是酒店的管子工霍纳偷了宝石，但宝石现在却出现在一只属于“亨利·贝克”的鹅肚子里。这是怎么一回事？", char: "CHAR_PLAYER" },
+    { speaker: "福尔摩斯", text: "没错，这下情况变了。不管霍纳是不是无辜的，亨利·贝克都是解开谜题的唯一线索。", char: "CHAR_HOLMES", audio:"./voice/chapter2/sherlock/没错，这下情.m4a" },
+    { speaker: "我", text: "我们需要立刻找到他！", char: "CHAR_PLAYER" },
+    { speaker: "福尔摩斯", text: "正是。队长，对你侦探破案能力的考验来了。我们要如何从拥有四百万人口的伦敦，把这个人挖出来？", char: "CHAR_HOLMES", audio:"./voice/chapter2/sherlock/正是，队长，.m4a", nextState: "STRATEGY_INPUT" }
+];
+
+// 静态报纸内容 - 泰晤士报
+const TIMES_ARTICLE = {
+    newspaper_headline: "大都会酒店珠宝失窃案！！",
+    // 拆分内容为块，以便布局
+    blocks: [
+        { title: "案情摘要", content: "本月22日，莫尔卡伯爵夫人的绝世珍宝“蓝宝石”在酒店套房失窃。这颗宝石价值连城，出世仅二十年。" },
+        { title: "嫌疑人", content: "约翰·霍纳（26岁，管子工）。已被警方逮捕，案发时只有他在房内焊接壁炉栏杆，且有偷窃前科。" },
+        { title: "证人指证", content: "酒店领班赖德指证：案发当日他带霍纳入室维修。赖德短暂离开，返回时发现霍纳已离开，妆台被撬，首饰盒空置。" },
+        { title: "警方案卷", content: "督察当晚将霍纳逮捕。虽未搜出宝石，但因其有前科，警方确信是其作案并已转移赃物。" },
+        { title: "庭审现场", content: "霍纳情绪极度激动，激烈抗辩无辜，当庭晕厥。案件已移交巡回法庭审理。" }
+    ],
+    editor_comment: "《泰晤士报》警务版",
+};
+
+const SUGGESTIONS = [
+    { label: "报警", text: "去苏格兰场（警察局），请求警方协助。" },
+    { label: "登报", text: "在晚报上刊登“失物招领”启事。" },
+    { label: "问询", text: "去捡到帽子的古吉街拐角，挨家挨户敲门询问。" },
+    { label: "出动小分队", text: "动用我的“贝克街小分队”，全城悬赏打听。" }
+];
+
+// --- 组件：打字机 ---
+const Typewriter = ({ text, onComplete }) => {
+  const [display, setDisplay] = useState("");
+  const [index, setIndex] = useState(0);
+  useEffect(() => { setDisplay(""); setIndex(0); }, [text]);
+  useEffect(() => {
+    if (index < text.length) {
+      const t = setTimeout(() => { setDisplay(v => v + text.charAt(index)); setIndex(i => i + 1); }, 25);
+      return () => clearTimeout(t);
+    } else if (onComplete) onComplete();
+  }, [index, text, onComplete]);
+  return <span>{display}</span>;
+};
+
+const App = () => {
+  const [gameState, setGameState] = useState('INTRO'); // INTRO, TIMES_REVEAL, STRATEGY_INPUT, PROCESSING_DIALOGUE, NEWSPAPER_REVEAL, SUCCESS_END
+  const [script, setScript] = useState(ACT2_INTRO_SCRIPT_PART1);
+  const [scriptIdx, setScriptIdx] = useState(0);
+  const [isTyping, setIsTyping] = useState(true);
+  
+  const [strategyInput, setStrategyInput] = useState("");
+  const [isBgmPlaying, setIsBgmPlaying] = useState(true);
+  const [currentEasterEgg, setCurrentEasterEgg] = useState(null);
+  const [failedAttempts, setFailedAttempts] = useState(0); // 记录失败次数
+  
+  // 报纸与API相关状态
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [newspaperData, setNewspaperData] = useState(null);
+  const [errorMsg, setErrorMsg] = useState('');
+  
+  const bgmRef = useRef(null);
+  const audioRef = useRef(null);
+
+  const curLine = script[scriptIdx] || {};
+
+  // 角色语音控制 Effect
+  useEffect(() => {
+      // 停止之前的音频
+      if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+      }
+      // 如果当前行有音频，则播放（中文文件名需要编码）
+      if (curLine && curLine.audio) {
+          const audioUrl = encodeURI(curLine.audio);
+          const audio = new Audio(audioUrl);
+          audioRef.current = audio;
+          audio.load();
+          audio.play().catch(e => console.log("Audio play failed:", e));
+      }
+  }, [scriptIdx, script]);
+
+  // BGM 控制
+  useEffect(() => {
+      if (bgmRef.current) {
+          if (isBgmPlaying) {
+              bgmRef.current.volume = 0.3;
+              bgmRef.current.play().catch(e => console.log("BGM play failed", e));
+          } else {
+              bgmRef.current.pause();
+          }
+      }
+  }, [isBgmPlaying]);
+
+  const handleNextLine = () => {
+    // 如果正在生成中且当前是最后一句，阻止继续
+    if (isGenerating && scriptIdx >= script.length - 1) return;
+
+    if (isTyping) { setIsTyping(false); return; }
+    if (scriptIdx < script.length - 1) {
+      setScriptIdx(i => i + 1);
+      setIsTyping(true);
+    } else {
+      const current = script[scriptIdx];
+      if (current.nextState) setGameState(current.nextState);
+    }
+  };
+
+  const handleSuggestionClick = (text) => {
+      setStrategyInput(text);
+  };
+
+  const handleSubmitStrategy = async () => {
+      if (!strategyInput.trim()) return;
+      
+      // 1. 切换到对话模式，显示玩家输入
+      const playerDialogue = [
+          { speaker: "我", text: strategyInput, char: "CHAR_PLAYER" },
+          { speaker: "系统", text: "（福尔摩斯正在推演该计划的可能性...）", isThinking: true }
+      ];
+      setScript(playerDialogue);
+      setScriptIdx(0);
+      setGameState('PROCESSING_DIALOGUE');
+      setIsTyping(true);
+      setIsGenerating(true);
+
+      try {
+          // 2. 调用 Dify API (workflow run)
+          const response = await fetch(`${DIFY_BASE_URL}/workflows/run`, {
+              method: 'POST',
+              headers: {
+                  'Authorization': `Bearer ${DIFY_API_KEY}`,
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                  inputs: { user_input: strategyInput },
+                  response_mode: "blocking",
+                  user: "player-act2"
+              })
+          });
+
+          if (!response.ok) throw new Error("API Request Failed");
+
+          const data = await response.json();
+          // Workflow 模式下，结果通常在 data.data.outputs 中
+          const outputs = data.data.outputs;
+          
+          console.log("Dify Workflow Result:", outputs);
+
+          // 解析 Dify 返回的嵌套 JSON 字符串
+          let result = null;
+          
+          // 1. 尝试遍历 outputs 寻找包含 JSON 的字符串字段 (因为 Dify LLM 节点输出通常是字符串)
+          if (outputs) {
+              for (const key in outputs) {
+                  if (typeof outputs[key] === 'string') {
+                      try {
+                          // 尝试提取 JSON 部分 (应对 Dify 返回包含 Markdown 或其他前缀的情况)
+                          const jsonMatch = outputs[key].match(/\{[\s\S]*\}/);
+                          const jsonStr = jsonMatch ? jsonMatch[0] : outputs[key];
+                          
+                          // 尝试解析字符串
+                          const parsed = JSON.parse(jsonStr);
+                          
+                          // 检查解析后的对象结构
+                          if (parsed.structured_output) {
+                              result = parsed.structured_output;
+                              break;
+                          } else if (parsed.status) {
+                              result = parsed;
+                              break;
+                          }
+                      } catch (e) {
+                          // console.log("Parsing failed for key:", key);
+                      }
+                  }
+              }
+          }
+
+          // 2. 如果还没找到，检查 outputs 本身是否就是结构化对象
+          if (!result && outputs) {
+              if (outputs.structured_output) {
+                  result = outputs.structured_output;
+              } else if (outputs.status) {
+                  result = outputs;
+              }
+          }
+
+          if (!result) {
+              console.error("无法解析 API 返回数据:", outputs);
+              throw new Error("API 返回数据格式无法识别");
+          }
+
+          console.log("Parsed Result:", result);
+
+          // 3. 根据返回状态处理剧情
+          if (result && result.status === 'STRATEGY') {
+              console.log("Setting newspaper data:", result.payload);
+              setNewspaperData(result.payload);
+              // 随机选择一个彩蛋
+              const eggs = GAME_CONFIG.sidebars.easterEggs;
+              setCurrentEasterEgg(eggs[Math.floor(Math.random() * eggs.length)]);
+              setFailedAttempts(prev => prev + 1); // 增加失败次数
+          } else if (result && result.status === 'CHAT') {
+              setFailedAttempts(prev => prev + 1); // CHAT 状态也算作尝试
+          }
+
+          setScript(prev => {
+              // 移除"正在思考"的占位符
+              const newScript = prev.filter(line => !line.isThinking);
+              
+              if (result.status === 'CHAT') {
+                  // CHAT 也可能返回 dialogue 数组或单条 message
+                  const chatContent = result.payload.dialogue 
+                      ? result.payload.dialogue.map(d => ({
+                          speaker: d.name === "Sherlock" ? "福尔摩斯" : (d.name === "Watson" ? "华生" : d.name),
+                          text: d.content,
+                          char: d.name === "Sherlock" ? "CHAR_HOLMES" : (d.name === "Watson" ? "CHAR_WATSON" : null),
+                          nextState: "STRATEGY_INPUT"
+                        }))
+                      : [{ 
+                          speaker: "福尔摩斯", 
+                          text: result.payload.message, 
+                          char: "CHAR_HOLMES", 
+                          nextState: "STRATEGY_INPUT" 
+                        }];
+                  return [...newScript, ...chatContent];
+          } else if (result.status === 'STRATEGY') {
+              // 解析对话列表
+              const dialogueScript = (result.payload.dialogue || []).map(d => ({
+                  speaker: d.name === "Sherlock" ? "福尔摩斯" : (d.name === "Watson" ? "华生" : d.name),
+                  text: d.content,
+                  char: d.name === "Sherlock" ? "CHAR_HOLMES" : (d.name === "Watson" ? "CHAR_WATSON" : null)
+              }));
+
+              return [...newScript, 
+                  ...dialogueScript,
+                  { 
+                      speaker: "旁白", 
+                      text: result.payload.transfer || "第二天……", 
+                      isTimePassage: true,
+                      nextState: "NEWSPAPER_REVEAL" 
+                  }
+              ];
+          } else if (result.status === 'CORRECT') {
+                  return [...newScript, 
+                      { speaker: "我", text: "我们不能大张旗鼓。他是个穷人，丢了昂贵的帽子和晚餐一定很心疼。我们要登报招领，那是他唯一的希望！", char: "CHAR_PLAYER" },
+                      { speaker: "福尔摩斯", text: "（打了个响指，眼神赞许）完美的策略！", char: "CHAR_HOLMES", audio:"./voice/chapter2/sherlock/完美的策略！.m4a" },
+                      { speaker: "福尔摩斯", text: "不提宝石，只提鹅和帽子。如果他是无辜的，他会为了晚餐而来；如果他心虚，这则广告就是最好的试金石。", char: "CHAR_HOLMES", audio:"./voice/chapter2/sherlock/不提宝石，只.m4a" },
+                      { speaker: "华生", text: "完美的心理战！", char: "CHAR_WATSON" },
+                      { speaker: "福尔摩斯", text: "彼得森，去把这个启事登在《环球报》、《星报》、《朴尔莫尔公报》、《圣詹姆斯纪事报》、《旗帜晚报》、《回声报》……所有你想得起来的晚报上。", char: "CHAR_HOLMES", audio:"./voice/chapter2/sherlock/彼得森，去把.m4a" },
+                      { speaker: "彼得森", text: "好的先生。但这宝石？", char:"CHAR_PETERSON" },
+                      { speaker: "福尔摩斯", text: "我先替伯爵夫人保管。另外，彼得森，回来路上买只新鹅，我们要赔给贝克先生。", char: "CHAR_HOLMES", audio:"./voice/chapter2/sherlock/我先替伯爵夫.m4a" },
+                      { speaker: "旁白", text: "（彼得森领命而去。福尔摩斯转向窗外纷飞的大雪。）" },
+                      { speaker: "福尔摩斯", text: "现在是上午10点。等到下午六点半，我们要么会迎来一位感激涕零的客人，要么会迎来一位狡猾的重罪犯。", char: "CHAR_HOLMES", audio:"./voice/chapter2/sherlock/现在是上午1.m4a" },
+                      { speaker: "福尔摩斯", text: "现在，我们等待。", char: "CHAR_HOLMES", audio:"./voice/chapter2/sherlock/现在，我们等.m4a", nextState: "SUCCESS_END" }
+                  ];
+              }
+              return newScript;
+          });
+
+      } catch (error) {
+          console.error(error);
+          setErrorMsg("思维殿堂连接中断，请重试...");
+          setScript(prev => prev.filter(line => !line.isThinking).concat({
+              speaker: "系统", text: "（连接超时，请检查网络或重试）", nextState: "STRATEGY_INPUT"
+          }));
+      } finally {
+          setIsGenerating(false);
+          // 如果当前停留在思考中，自动推进一行
+          if (scriptIdx === 0 && !isTyping) {
+             // handleNextLine(); // 让用户自己点或者自动跳，这里选择让用户点，因为思考文案已经变了
+          }
+      }
+  };
+
+  return (
+    <div className="flex flex-col h-screen bg-[#FDFBF7] text-[#433D35] font-serif max-w-md mx-auto relative overflow-hidden shadow-2xl border-x-4 border-[#E8E2D6]">
+        <audio ref={bgmRef} src={ASSETS.BGM} loop />
+        
+        {/* BGM 开关 */}
+        <button 
+            onClick={() => setIsBgmPlaying(!isBgmPlaying)} 
+            className="absolute top-4 left-4 z-[60] bg-white/90 p-2 rounded-full shadow-lg border border-slate-200 text-slate-600 active:scale-95 transition-all"
+        >
+            {isBgmPlaying ? <span className="animate-spin-slow inline-block">🎵</span> : <span className="opacity-50">🔇</span>}
+        </button>
+
+        {/* --- SCENE: DIALOGUE (INTRO & PROCESSING) --- */}
+        {(gameState === 'INTRO' || gameState === 'PROCESSING_DIALOGUE' || gameState === 'SUCCESS_END') && (
+            <div className="flex flex-col h-full bg-[#1a1a1c] relative animate-in fade-in" onClick={handleNextLine}>
+                <div className="absolute inset-0 z-0">
+                    <img src={ASSETS.BG_CLIMAX} className="w-full h-full object-cover opacity-90 blur-[1px]" alt="bg" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                    
+                    {/* Dark overlay for time passage */}
+                    {curLine.isTimePassage && <div className="absolute inset-0 bg-black/80 transition-opacity duration-1000 z-10" />} 
+                </div>
+                <div className="absolute inset-0 z-10 flex items-end justify-center pointer-events-none">
+                    {/* Hide character if time passage */}
+                    {curLine.char && !curLine.isTimePassage && <img key={curLine.char} src={ASSETS[curLine.char]} className="h-[130%] object-contain drop-shadow-2xl animate-in slide-in-from-bottom duration-700 translate-y-[15%]" alt="tachie" />}
+                </div>
+
+                <div className="absolute top-[52%] left-4 right-4 z-20">
+                    {/* Center text for time passage */}
+                    {curLine.isTimePassage ? (
+                         <div className="flex items-center justify-center min-h-[140px]">
+                             <p className="text-white text-xl font-black italic tracking-widest animate-pulse">{curLine.text}</p>
+                         </div>
+                    ) : (
+                        <div className="bg-white/95 backdrop-blur-md border-2 border-[#D1C7B7] rounded-3xl shadow-2xl p-6 min-h-[140px] relative">
+                            {curLine.speaker && <div className="absolute -top-4 left-6 bg-indigo-600 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md border-2 border-white">{String(curLine.speaker)}</div>}
+                            <div className="text-[15px] text-[#2a1f16] leading-relaxed italic">
+                                <Typewriter text={String(curLine.text || "")} onComplete={() => setIsTyping(false)} />
+                            </div>
+                            {/* 如果是正在思考中，显示 Loading 图标 */}
+                            {curLine.isThinking && isGenerating ? (
+                                <div className="absolute bottom-4 right-6 text-indigo-400 animate-spin"><Loader2 size={18} /></div>
+                            ) : (
+                                !isTyping && <div className="absolute bottom-4 right-6 text-indigo-400 animate-bounce"><ArrowRight size={18} /></div>
+                            )}
+                            
+                            {/* 成功结束时的按钮 */}
+                            {gameState === 'SUCCESS_END' && !isTyping && scriptIdx === script.length - 1 && (
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); alert("第二幕完。敬请期待第三幕！"); }} 
+                                    className="absolute -bottom-12 left-1/2 -translate-x-1/2 px-8 py-3 bg-indigo-600 text-white font-black text-xs uppercase tracking-[0.2em] rounded-full shadow-lg animate-in slide-in-from-bottom"
+                                >
+                                    进入下一幕
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {/* --- SCENE: STRATEGY INPUT --- */}
+        {gameState === 'STRATEGY_INPUT' && (
+            <div className="flex flex-col h-full bg-[#1a1a1c] relative animate-in zoom-in">
+                {/* 背景模糊处理 */}
+                <div className="absolute inset-0 z-0">
+                    <img src={ASSETS.BG_CLIMAX} className="w-full h-full object-cover opacity-40 blur-md" alt="bg" />
+                    <div className="absolute inset-0 bg-black/60" />
+                </div>
+
+                <div className="relative z-10 flex flex-col h-full p-6">
+                    <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
+                        <div className="text-center mb-8 animate-in slide-in-from-top duration-700">
+                            <h2 className="text-2xl font-black text-white mb-2 flex items-center justify-center gap-2">
+                                <Lightbulb className="text-yellow-400" fill="currentColor" /> 制定搜查计划
+                            </h2>
+                            <p className="text-white/60 text-sm font-serif italic">“这就看你怎么运用这些线索了，小队长。”</p>
+                        </div>
+
+                        {/* 建议词 */}
+                        <div className="flex flex-wrap justify-center gap-2 mb-6">
+                            {SUGGESTIONS.map((sug, idx) => {
+                                const isHint = failedAttempts >= 3 && sug.label === "登报";
+                                return (
+                                    <button 
+                                        key={idx}
+                                        onClick={() => handleSuggestionClick(sug.text)}
+                                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all active:scale-95 animate-in zoom-in ${
+                                            isHint 
+                                            ? 'bg-yellow-400 text-black border-2 border-yellow-500 shadow-[0_0_15px_rgba(250,204,21,0.6)] animate-pulse' 
+                                            : 'bg-white/10 hover:bg-indigo-600 hover:text-white text-indigo-200 border border-indigo-500/30'
+                                        }`}
+                                        style={{ animationDelay: `${idx * 100}ms` }}
+                                    >
+                                        {sug.label}
+                                        {isHint && <span className="ml-1 text-[10px]">✨</span>}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* 输入框区域 */}
+                        <div className="bg-white rounded-2xl p-2 shadow-2xl animate-in slide-in-from-bottom duration-700 delay-300">
+                            <textarea
+                                value={strategyInput}
+                                onChange={(e) => setStrategyInput(e.target.value)}
+                                placeholder="输入你的行动计划..."
+                                className="w-full h-32 p-4 bg-slate-50 rounded-xl text-slate-800 text-sm font-serif leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
+                            />
+                            <div className="flex justify-end p-2">
+                                <button 
+                                    onClick={handleSubmitStrategy}
+                                    disabled={!strategyInput.trim() || isGenerating}
+                                    className={`flex items-center gap-2 px-6 py-2 rounded-lg font-black text-xs uppercase tracking-wider transition-all ${
+                                        strategyInput.trim() && !isGenerating
+                                        ? 'bg-indigo-900 text-white hover:bg-indigo-800 shadow-lg' 
+                                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                    }`}
+                                >
+                                    {isGenerating ? <Loader2 className="animate-spin" size={14} /> : <><Send size={14} /> 提交计划</>}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* 泰晤士报弹出层 (剧情展示) */}
+        {gameState === 'TIMES_REVEAL' && (
+            <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-[100] p-4 animate-newspaper-in">
+              <div className="bg-[#f2eecb] text-[#1a1612] w-full max-w-sm h-auto max-h-[90vh] shadow-[0_0_80px_rgba(0,0,0,0.8)] border-8 border-double border-[#2c241b] relative flex flex-col overflow-hidden rounded-sm">
+                
+                {/* 纸张纹理 */}
+                <div className="absolute inset-0 opacity-20 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/paper-fibers.png')] mix-blend-multiply"></div>
+                <div className="absolute inset-0 opacity-10 pointer-events-none bg-gradient-to-br from-yellow-900/10 to-transparent"></div>
+                
+                {/* 报头区域 */}
+                <header className="flex-shrink-0 border-b-4 border-[#1a1612] p-3 pb-1 text-center relative z-10">
+                  <div className="flex justify-between items-end border-b-2 border-[#1a1612] pb-1 mb-1 px-1">
+                     <span className="text-[9px] font-bold uppercase tracking-widest text-[#4a3b2a]">$0.10</span>
+                     <span className="text-[9px] font-bold uppercase tracking-widest text-[#4a3b2a]">Dec 23, 1889</span>
+                     <span className="text-[9px] font-bold uppercase tracking-widest text-[#4a3b2a]">No. 9,876</span>
+                  </div>
+                  <h1 className="font-serif text-4xl font-black text-[#1a1612] tracking-tighter scale-y-90 mb-0.5">
+                    The Times
+                  </h1>
+                  <p className="text-[9px] italic font-serif text-[#4a3b2a] border-t border-[#1a1612] pt-0.5 mt-0.5 truncate">
+                    "Repara que quien habla elogiosamente de sí mismo, cuanto más se alaba..."
+                  </p>
+                </header>
+
+                {/* 内容区域 (无滚动，紧凑布局) */}
+                <div className="flex-1 overflow-hidden relative z-10 p-3 pt-2 flex flex-col">
+                    {/* 主头条 & 图片 */}
+                    <div className="mb-2 shrink-0">
+                        <h2 className="font-serif text-lg font-bold leading-none mb-1 text-center uppercase border-b border-black/10 pb-1">
+                           {TIMES_ARTICLE.newspaper_headline}
+                        </h2>
+                        
+                        {/* 图片区域 - 缩小高度 */}
+                        <div className="relative w-full h-32 bg-gray-200 mb-2 overflow-hidden border-2 border-[#1a1612] shadow-inner group">
+                            <img 
+                                src={ASSETS.BG_CLIMAX} 
+                                className="w-full h-full object-cover grayscale contrast-125 brightness-90 group-hover:scale-105 transition-transform duration-1000"
+                                alt="Blue Carbuncle"
+                            />
+                            <img 
+                                src="./pic/event_blueCarbuncle.png" 
+                                className="absolute inset-0 w-full h-full object-contain p-2 grayscale contrast-125 brightness-110 drop-shadow-xl"
+                                alt="The Gem"
+                            />
+                            <div className="absolute bottom-0 left-0 right-0 bg-white/80 backdrop-blur-sm py-0.5 px-2 border-t border-[#1a1612]">
+                                <p className="text-[8px] font-bold uppercase text-center tracking-wider">Fig 1. The Stolen Blue Carbuncle</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 文本块布局 (Grid) - 纵向分割，紧凑布局 */ }
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 flex-1 min-h-0 relative">
+                        {/* 纵向分割线 */}
+                        <div className="absolute top-0 bottom-0 left-1/2 w-px bg-[#1a1612]/20 -translate-x-1/2"></div>
+                        
+                        {TIMES_ARTICLE.blocks.map((block, idx) => (
+                            <div key={idx} className={`flex flex-col justify-start ${idx === 0 ? 'col-span-2 pb-2 border-b border-[#1a1612]/20 mb-1' : 'col-span-1'}`}>
+                                <h3 className="font-sans text-[9px] font-black uppercase border-b border-black/10 pb-0.5 mb-0.5 tracking-wider text-[#2c241b] leading-tight inline-block">
+                                    {block.title}
+                                </h3>
+                                <p className="font-serif text-[10px] leading-snug text-justify text-[#1a1612]">
+                                    {block.content}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* 底部 Footer */}
+                    <div className="mt-1 pt-1 border-t-2 border-double border-[#1a1612] text-center shrink-0">
+                         <span className="bg-[#1a1612] text-[#f2eecb] px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest">
+                            Police Report - Page 3
+                         </span>
+                    </div>
+                </div>
+
+                {/* 底部按钮 */}
+                <button 
+                  onClick={() => {
+                    setScript(ACT2_INTRO_SCRIPT_PART2);
+                    setScriptIdx(0);
+                    setGameState('INTRO');
+                    setIsTyping(true);
+                  }}
+                  className="flex-shrink-0 w-full py-3 bg-[#1a1612] text-[#f2eecb] font-black uppercase tracking-[0.2em] hover:bg-[#333] transition-colors text-xs border-t-4 border-[#2c241b] relative z-20"
+                >
+                  <span className="flex items-center justify-center gap-2">
+                     放下报纸 <ArrowRight size={14} />
+                  </span>
+                </button>
+              </div>
+            </div>
+        )}
+
+        {/* 报纸弹出层 (失败分支) */}
+        {gameState === 'NEWSPAPER_REVEAL' && (
+            <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-[100] p-4 animate-newspaper-in">
+              <div className="bg-[#f0e6d2] text-[#1a1612] w-full max-w-sm p-6 shadow-[0_0_80px_rgba(0,0,0,0.8)] border-double border-8 border-[#1a1612] relative flex flex-col gap-4 overflow-hidden rotate-1">
+                <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/old-map.png')]"></div>
+                
+                {/* 报头 */}
+                <div className="border-b-4 border-[#1a1612] pb-4 text-center relative z-10">
+                  <div className="text-[10px] font-bold flex justify-between mb-1 uppercase tracking-tighter">
+                    <span>EST. 1855</span>
+                    <span>London</span>
+                  </div>
+                  <h2 className="text-3xl font-black uppercase font-serif tracking-tighter italic border-y-2 border-[#1a1612] py-2 mb-2">
+                    The Chronicle
+                  </h2>
+                  <div className="flex justify-between text-[10px] font-black italic">
+                    <span>No. 23,491</span>
+                    <span>DEC 27, 1890</span>
+                  </div>
+                </div>
+                
+                <div className="relative z-10">
+                    <h3 className="text-xl font-black leading-tight text-center mb-4 underline decoration-double">
+                      {newspaperData?.newspaper_headline || newspaperData?.headline || "【无果的搜寻】"}
+                    </h3>
+                    <p className="text-sm leading-[1.6] font-serif text-justify">
+                      <span className="text-4xl float-left mr-2 font-black mt-[-8px]">
+                        {(newspaperData?.newspaper_body || newspaperData?.body || "侦探").charAt(0)}
+                      </span>
+                      {(newspaperData?.newspaper_body || newspaperData?.body || "侦探的失误让整条街道陷入混乱。").slice(1)}
+                    </p>
+                    <div className="mt-6 pt-4 border-t border-dotted border-[#1a1612] italic text-xs font-bold text-right">
+                      —— {newspaperData?.editor_comment || newspaperData?.footer || "“再接再厉吧。”"}
+                    </div>
+                </div>
+
+                <div className="bg-black/5 p-3 mt-2 border-t-2 border-[#1a1612]">
+                    <h4 className="text-[10px] font-black uppercase mb-1">本周热门：{currentEasterEgg?.title}</h4>
+                    <p className="text-[10px] italic">{currentEasterEgg?.content}</p>
+                </div>
+
+                <button 
+                  onClick={() => {
+                    setGameState('STRATEGY_INPUT');
+                    setStrategyInput('');
+                  }}
+                  className="mt-4 w-full py-3 bg-[#1a1612] text-[#f0e6d2] font-black uppercase tracking-widest hover:bg-[#333] transition-colors shadow-lg active:scale-95 text-xs"
+                >
+                  撕碎报纸，重新构想
+                </button>
+              </div>
+            </div>
+        )}
+
+        {errorMsg && (
+            <div className="fixed bottom-6 right-6 bg-red-900 text-white px-4 py-2 rounded shadow-2xl flex items-center gap-3 animate-fade-in z-[100] border border-red-500">
+              <AlertCircle size={20} /> <span className="font-bold text-xs">{errorMsg}</span>
+            </div>
+        )}
+
+        <style>{`
+            @keyframes newspaper-in {
+              0% { opacity: 0; transform: scale(0.3) rotate(-45deg) translateY(500px); }
+              70% { transform: scale(1.05) rotate(3deg) translateY(-20px); }
+              100% { opacity: 1; transform: scale(1) rotate(1deg) translateY(0); }
+            }
+            .animate-newspaper-in { animation: newspaper-in 0.8s cubic-bezier(0.19, 1, 0.22, 1) forwards; }
+        `}</style>
+    </div>
+  );
+};
+
+const root = createRoot(document.getElementById('root'));
+root.render(<App />);
+    </script>
+</body>
+</html>
