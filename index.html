@@ -41,8 +41,8 @@ import {
 } from 'lucide-react';
 
 // --- 系统配置 ---
-        const DIFY_BASE_URL = "http://ops.pd.ximalaya.local/dify/v1";
-        const DIFY_API_KEY = "app-9FD0h0sdZ3yBkDla76BJq9xd";
+        // 改为调用后端代理，避免前端暴露 Dify Key，并解决公网页面无法直连内网 Dify 的问题。
+        const AI_PROXY_URL = window.__AI_PROXY_URL__ || "http://localhost:8787/api/dify";
 
 // --- 资源配置 ---
 const ASSETS = {
@@ -583,16 +583,13 @@ const App = () => {
             try {
                 console.log("正在请求 Dify Workflow...");
                 
-                const response = await fetch(`${DIFY_BASE_URL}/workflows/run`, {
+                const response = await fetch(AI_PROXY_URL, {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${DIFY_API_KEY}`,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        inputs: { user_gamePerformance: reportStr },
-                        response_mode: "blocking",
-                        user: "player-act1"
+                        reportStr
                     })
                 });
 
