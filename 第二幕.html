@@ -47,19 +47,32 @@ import {
 const DOUBAO_API_URL = "https://ark.cn-beijing.volces.com/api/v3/responses";
 const DOUBAO_MODEL = "doubao-seed-2-0-lite-260215";
 const DOUBAO_API_KEY = window.__DOUBAO_API_KEY__ || "";
+const SUPPORTS_WEBP = (() => {
+    try {
+        const canvas = document.createElement("canvas");
+        return canvas.toDataURL("image/webp").indexOf("data:image/webp") === 0;
+    } catch (e) {
+        return false;
+    }
+})();
 const IS_MOBILE_VIEW = window.matchMedia("(max-width: 768px)").matches;
+const getAsset = (basePathWithoutExt, fallbackExt = "jpg") => (
+    SUPPORTS_WEBP ? `${basePathWithoutExt}.webp` : `${basePathWithoutExt}.${fallbackExt}`
+);
 const getSceneAsset = (basePathWithoutExt) => (
-    IS_MOBILE_VIEW ? `${basePathWithoutExt}-mobile.webp` : `${basePathWithoutExt}.webp`
+    IS_MOBILE_VIEW
+        ? (SUPPORTS_WEBP ? `${basePathWithoutExt}-mobile.webp` : `${basePathWithoutExt}.jpg`)
+        : getAsset(basePathWithoutExt, "jpg")
 );
 
 // --- 资源配置 ---
 const ASSETS = {
     BG_221B: getSceneAsset("./pic/scene/scene_livingroom"),
     BG_CLIMAX: getSceneAsset("./pic/scene/scene4"),
-    CHAR_HOLMES: "./pic/character/character_sherlock.webp",
-    CHAR_WATSON: "./pic/character/character_waston.webp",
-    CHAR_PLAYER: "./pic/character/character_player.webp",
-    CHAR_PETERSON: "./pic/character/character_peterson.webp",
+    CHAR_HOLMES: getAsset("./pic/character/character_sherlock", "png"),
+    CHAR_WATSON: getAsset("./pic/character/character_waston", "png"),
+    CHAR_PLAYER: getAsset("./pic/character/character_player", "png"),
+    CHAR_PETERSON: getAsset("./pic/character/character_peterson", "png"),
     BGM: "./voice/bgm/bgm1.mp3",
 };
 
@@ -593,7 +606,7 @@ input: ${strategyInput}`;
                                 alt="Blue Carbuncle"
                             />
                             <img 
-                                src="./pic/event_blueCarbuncle.webp"
+                                src={getAsset("./pic/event_blueCarbuncle", "jpg")}
                                 className="absolute inset-0 w-full h-full object-contain p-2 grayscale contrast-125 brightness-110 drop-shadow-xl"
                                 alt="The Gem"
                             />
