@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>蓝宝石案 - 第二幕</title>
     
+    <link rel="preload" as="image" href="./pic/scene/scene_livingroom.webp" imagesrcset="./pic/scene/scene_livingroom-mobile.webp 768w, ./pic/scene/scene_livingroom.webp 1536w" imagesizes="100vw">
+
+    
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -64,15 +67,21 @@ const getSceneAsset = (basePathWithoutExt) => (
         ? (SUPPORTS_WEBP ? `${basePathWithoutExt}-mobile.webp` : `${basePathWithoutExt}.jpg`)
         : getAsset(basePathWithoutExt, "jpg")
 );
+// 移动端优先加载 -mobile.webp 小尺寸版本（角色/线索/事件图）
+const getMobileAsset = (basePathWithoutExt, fallbackExt = "jpg") => (
+    (IS_MOBILE_VIEW && SUPPORTS_WEBP)
+        ? `${basePathWithoutExt}-mobile.webp`
+        : getAsset(basePathWithoutExt, fallbackExt)
+);
 
 // --- 资源配置 ---
 const ASSETS = {
     BG_221B: getSceneAsset("./pic/scene/scene_livingroom"),
     BG_CLIMAX: getSceneAsset("./pic/scene/scene4"),
-    CHAR_HOLMES: getAsset("./pic/character/character_sherlock", "png"),
-    CHAR_WATSON: getAsset("./pic/character/character_waston", "png"),
-    CHAR_PLAYER: getAsset("./pic/character/character_player", "png"),
-    CHAR_PETERSON: getAsset("./pic/character/character_peterson", "png"),
+    CHAR_HOLMES: getMobileAsset("./pic/character/character_sherlock", "png"),
+    CHAR_WATSON: getMobileAsset("./pic/character/character_waston", "png"),
+    CHAR_PLAYER: getMobileAsset("./pic/character/character_player", "png"),
+    CHAR_PETERSON: getMobileAsset("./pic/character/character_peterson", "png"),
     BGM: "./voice/bgm/bgm1.mp3",
 };
 
@@ -165,15 +174,28 @@ const App = () => {
 
   useEffect(() => {
       const preloadImage = (src) => {
+          if (!src) return;
           const img = new Image();
           img.decoding = "async";
           img.src = src;
       };
+      // 第一优先级：首屏背景（立即加载）
       preloadImage(ASSETS.BG_221B);
-      const timer = setTimeout(() => {
+      
+      // 第二优先级：角色立绘（500ms 后，避免与首屏背景争抢带宽）
+      const timerChars = setTimeout(() => {
+          [ASSETS.CHAR_HOLMES, ASSETS.CHAR_WATSON, ASSETS.CHAR_PETERSON, ASSETS.CHAR_PLAYER].forEach(preloadImage);
+      }, 500);
+
+      // 第三优先级：场景与后续内容（1200ms 后）
+      const timerScenes = setTimeout(() => {
           preloadImage(ASSETS.BG_CLIMAX);
       }, 1200);
-      return () => clearTimeout(timer);
+
+      return () => {
+          clearTimeout(timerChars);
+          clearTimeout(timerScenes);
+      };
   }, []);
 
   // 角色语音控制 Effect
