@@ -47,11 +47,15 @@ import {
 const DOUBAO_API_URL = "https://ark.cn-beijing.volces.com/api/v3/responses";
 const DOUBAO_MODEL = "doubao-seed-2-0-lite-260215";
 const DOUBAO_API_KEY = window.__DOUBAO_API_KEY__ || "";
+const IS_MOBILE_VIEW = window.matchMedia("(max-width: 768px)").matches;
+const getSceneAsset = (basePathWithoutExt) => (
+    IS_MOBILE_VIEW ? `${basePathWithoutExt}-mobile.webp` : `${basePathWithoutExt}.webp`
+);
 
 // --- 资源配置 ---
 const ASSETS = {
-    BG_221B: "./pic/scene/scene_livingroom.jpg",
-    BG_CLIMAX: "./pic/scene/scene4.jpg",
+    BG_221B: getSceneAsset("./pic/scene/scene_livingroom"),
+    BG_CLIMAX: getSceneAsset("./pic/scene/scene4"),
     CHAR_HOLMES: "./pic/character/character_sherlock.png",
     CHAR_WATSON: "./pic/character/character_waston.png",
     CHAR_PLAYER: "./pic/character/character_player.png",
@@ -145,6 +149,19 @@ const App = () => {
   const audioRef = useRef(null);
 
   const curLine = script[scriptIdx] || {};
+
+  useEffect(() => {
+      const preloadImage = (src) => {
+          const img = new Image();
+          img.decoding = "async";
+          img.src = src;
+      };
+      preloadImage(ASSETS.BG_221B);
+      const timer = setTimeout(() => {
+          preloadImage(ASSETS.BG_CLIMAX);
+      }, 1200);
+      return () => clearTimeout(timer);
+  }, []);
 
   // 角色语音控制 Effect
   useEffect(() => {

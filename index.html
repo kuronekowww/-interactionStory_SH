@@ -49,10 +49,14 @@ import {
         const DOUBAO_MODEL = "doubao-seed-2-0-mini-260215";
         // 建议在 HTML 里注入 window.__DOUBAO_API_KEY__，避免硬编码在仓库中。
         const DOUBAO_API_KEY = window.__DOUBAO_API_KEY__ || "";
+        const IS_MOBILE_VIEW = window.matchMedia("(max-width: 768px)").matches;
+        const getSceneAsset = (basePathWithoutExt) => (
+          IS_MOBILE_VIEW ? `${basePathWithoutExt}-mobile.webp` : `${basePathWithoutExt}.webp`
+        );
 
 // --- 资源配置 ---
 const ASSETS = {
-          BG_221B: "./pic/scene/scene_livingroom.jpg",
+          BG_221B: getSceneAsset("./pic/scene/scene_livingroom"),
           CHAR_HOLMES: "./pic/character/character_sherlock.png",
           CHAR_WATSON: "./pic/character/character_waston.png",
           CHAR_PETERSON: "./pic/character/character_peterson.png",
@@ -62,9 +66,9 @@ const ASSETS = {
           BGM: "./voice/bgm/bgm1.mp3", // 背景音乐
           EVENT_GOOSE: "./pic/event_goose.jpg",
           EVENT_HAT: "./pic/event_hat.jpg",
-          BG_DEDUCTION: "./pic/scene/scene3.jpg",
-          BG_CLIMAX: "./pic/scene/scene4.jpg",
-          BG_END: "./pic/chapter.jpg"
+          BG_DEDUCTION: getSceneAsset("./pic/scene/scene3"),
+          BG_CLIMAX: getSceneAsset("./pic/scene/scene4"),
+          BG_END: getSceneAsset("./pic/chapter")
 };
 
 // --- 线索数据定义 ---
@@ -368,6 +372,21 @@ const App = () => {
           const bgmRef = useRef(null);
 
   useEffect(() => { foundClueIdsRef.current = foundClueIds; }, [foundClueIds]);
+
+  useEffect(() => {
+      const preloadImage = (src) => {
+          const img = new Image();
+          img.decoding = "async";
+          img.src = src;
+      };
+      // 首屏优先
+      preloadImage(ASSETS.BG_221B);
+      // 后续场景延时加载，避免和首屏争抢带宽
+      const timer = setTimeout(() => {
+          [ASSETS.BG_DEDUCTION, ASSETS.BG_CLIMAX, ASSETS.BG_END].forEach(preloadImage);
+      }, 1200);
+      return () => clearTimeout(timer);
+  }, []);
 
   // 历史对话自动滚动到底部
   useEffect(() => {
