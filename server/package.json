@@ -1,8 +1,8 @@
 {
-  "name": "interaction-story-dify-proxy",
+  "name": "interaction-story-doubao-proxy",
   "version": "1.0.0",
   "private": true,
-  "description": "Proxy API for Dify workflow",
+  "description": "Proxy API and static server for Doubao-powered interaction story",
   "main": "proxy-server.js",
   "scripts": {
     "start": "node proxy-server.js"

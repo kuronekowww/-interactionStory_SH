@@ -38,10 +38,6 @@
 <body>
   <div id="root"></div>
 
-  <script>
-    window.__DOUBAO_API_KEY__ = "13dec97b-ed48-4f2b-865e-bd10d7d3e462";
-  </script>
-
   <script type="text/babel" data-type="module">
     import React, { useState, useEffect, useRef } from 'react';
     import { createRoot } from 'react-dom/client';
@@ -54,9 +50,7 @@
     } from 'lucide-react';
 
     // --- 系统配置 ---
-    const DOUBAO_API_URL = "https://ark.cn-beijing.volces.com/api/v3/responses";
-    const DOUBAO_MODEL = "doubao-seed-2-0-mini-260215";
-    // 建议在 HTML 里注入 window.__DOUBAO_API_KEY__，避免硬编码在代码中。
+    const DOUBAO_ACT1_ENDPOINT = "/api/doubao/act1";
     const SUPPORTS_WEBP = (() => {
       try {
         const canvas = document.createElement("canvas");
@@ -650,80 +644,13 @@
         console.log("最终玩家表现数据报告：\n", reportStr);
 
         try {
-          console.log("正在请求豆包 Responses API...");
-          const prompt = `# Role: 贝克街互动剧本生成引擎
-
-# Context
-玩家作为福尔摩斯的学徒，刚刚完成了《蓝宝石案》第一幕。系统收集了玩家的表现数据。你需要生成两部分内容：
-1. 初始评价：福尔摩斯和华生基于数据对玩家的评价（幕后小剧场）。
-2. 互动分支：提供3个玩家回复选项，并生成对应的后续回应剧情。
-
-# Input Data
-玩家表现数据：
-${reportStr}
-
-# Character Settings
-福尔摩斯 (Sherlock Holmes):
-- 核心态度：极度自负、智性恋、优雅的傲慢、典型的“Tsundere”（口嫌体正直）。
-- 对待玩家：
-  - 把玩家当做“甚至不如苏格兰场警察敏锐”的普通人，所以对玩家的任何一点进步都感到“意外”。语言口语化，称呼玩家为“小队长”。
-  - 避免攻击性：不要说“蠢”，要说“思维被迷雾笼罩”。
-  - 面对求夸奖：如果玩家撒娇或求夸，他会表现得不耐烦但实际上会给出认可（“好了好了，别像个讨糖吃的孩子”）。
-
-华生 (Dr. Watson):
-- 核心态度：温暖的守护者、捧哏、情感翻译机。
-- 功能：负责把福尔摩斯的冷嘲热讽翻译成“他其实很欣赏你”。
-
-# Generation Logic
-## Part 1: 初始评价 (Initial Dialogue)
-基于数据生成。如果玩家有错，福尔摩斯调侃其弯路；如果全对，福尔摩斯表示“勉强合格”。
-
-## Part 2: 玩家选项与回应 (Options & Responses)
-生成 3 个情感正向的选项，分别对应不同性格的玩家，并生成对应的后续对话：
-
-选项 1：【寻求认可/撒娇委屈型】
-- 后续回应：华生会立刻安慰；福尔摩斯虽然嘴硬，但最后会给出一句含蓄肯定。
-
-选项 2：【自信满满/开心骄傲型】
-- 后续回应：福尔摩斯会打击一下玩家的嚣张气焰，但嘴角是上扬的；华生会笑着附和玩家。
-
-选项 3：【谦虚崇拜/认真学习型】
-- 后续回应：福尔摩斯会收起嘲讽，给出一句比较正经的导师寄语。
-
-# Output Format
-你必须且仅输出一个 JSON 对象，不要输出 markdown 代码块，不要输出额外解释。
-结构如下：
-{
-  "initial_dialogue": [ { "speaker": "角色名", "content": "对话内容" } ],
-  "options": [
-    {
-      "id": 1,
-      "text": "选项文案",
-      "response_dialogue": [ { "speaker": "角色名", "content": "对话内容" } ]
-    }
-  ]
-}`;
-
-          if (!DOUBAO_API_KEY) throw new Error("缺少豆包 API Key：请注入 window.__DOUBAO_API_KEY__");
-
-          const response = await fetch(DOUBAO_API_URL, {
+          console.log("正在请求豆包代理...");
+          const response = await fetch(DOUBAO_ACT1_ENDPOINT, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${DOUBAO_API_KEY}`,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-              model: DOUBAO_MODEL,
-              thinking: { type: "disabled" },
-              input: [
-                {
-                  role: "user",
-                  content: [
-                    { type: "input_text", text: prompt }
-                  ]
-                }
-              ]
-            })
+            body: JSON.stringify({ reportStr })
           });
 
           if (!response.ok) {
@@ -732,31 +659,8 @@ ${reportStr}
             throw new Error(`API Error: ${response.status}`);
           }
 
-          const data = await response.json();
-          console.log("豆包返回原始数据:", data);
-
-          let result = null;
-          let modelText = data.output_text || "";
-
-          if (!modelText && Array.isArray(data.output)) {
-            for (const item of data.output) {
-              const contentList = item && item.content;
-              if (!Array.isArray(contentList)) continue;
-              for (const c of contentList) {
-                if (c && (c.type === "output_text" || c.type === "text") && c.text) {
-                  modelText += c.text;
-                }
-              }
-            }
-          }
-
-          if (modelText) {
-            const jsonMatch = modelText.match(/\{[\s\S]*\}/);
-            const jsonStr = jsonMatch ? jsonMatch[0] : modelText;
-            result = JSON.parse(jsonStr);
-          }
-
-          if (!result) throw new Error("无法解析豆包返回的数据");
+          const result = await response.json();
+          console.log("豆包代理返回数据:", result);
 
           setDetectiveReport(result);
         } catch (e) {

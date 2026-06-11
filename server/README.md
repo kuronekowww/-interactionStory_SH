@@ -1,6 +1,6 @@
-# Dify 代理服务
+# 豆包代理与静态站点服务
 
-用于给前端页面提供安全的转发接口，避免在浏览器暴露 Dify API Key，并解决 GitHub Pages 不能直连内网 Dify 的问题。
+用于给前端页面提供安全的同源转发接口，避免在浏览器暴露豆包 API Key。提示词也在服务端拼接，前端只提交玩家表现数据或玩家输入。
 
 ## 1) 安装依赖
 
@@ -17,9 +17,11 @@ cp .env.example .env
 
 至少需要配置：
 
-- `DIFY_BASE_URL`：内网 Dify 地址（含 `/v1`）
-- `DIFY_API_KEY`：Dify 应用密钥
-- `ALLOWED_ORIGINS`：允许访问代理的前端域名（逗号分隔）
+- `DOUBAO_API_KEY`：火山方舟/豆包 API Key
+- `DOUBAO_API_URL`：默认 `https://ark.cn-beijing.volces.com/api/v3/responses`
+- `DOUBAO_ACT1_MODEL`：第一幕评价使用的模型
+- `DOUBAO_ACT2_MODEL`：第二幕策略判断使用的模型
+- `ALLOWED_ORIGINS`：允许跨域访问代理的前端域名（逗号分隔）
 
 ## 3) 启动
 
@@ -29,16 +31,16 @@ npm start
 
 默认地址：`http://localhost:8787`
 
-## 4) 前端接入
+这个服务会同时托管项目根目录的静态页面：
 
-前端默认请求：`http://localhost:8787/api/dify`
+- `http://localhost:8787/`
+- `http://localhost:8787/第二幕.html`
 
-如果你把代理部署到了线上域名，可在 `index.html` 前注入：
+## 4) 前端接口
 
-```html
-<script>
-  window.__AI_PROXY_URL__ = "https://your-proxy-domain/api/dify";
-</script>
-```
+前端默认请求同源接口：
 
-再加载业务脚本即可。
+- `POST /api/doubao/act1`，body: `{ "reportStr": "..." }`
+- `POST /api/doubao/act2`，body: `{ "strategyInput": "..." }`
+
+生产部署时，把 `server` 目录作为 Node 服务部署，并配置上面的环境变量。

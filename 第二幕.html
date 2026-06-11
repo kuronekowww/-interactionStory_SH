@@ -47,9 +47,6 @@
 
 <body>
     <div id="root"></div>
-    <script>
-        window.__DOUBAO_API_KEY__ = "13dec97b-ed48-4f2b-865e-bd10d7d3e462";
-    </script>
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
@@ -60,9 +57,7 @@
         } from 'lucide-react';
 
         // --- 系统配置 ---
-        const DOUBAO_API_URL = "https://ark.cn-beijing.volces.com/api/v3/responses";
-        const DOUBAO_MODEL = "doubao-seed-2-0-lite-260215";
-        const DOUBAO_API_KEY = window.__DOUBAO_API_KEY__ || "";
+        const DOUBAO_ACT2_ENDPOINT = "/api/doubao/act2";
         const SUPPORTS_WEBP = (() => {
             try {
                 const canvas = document.createElement("canvas");
@@ -273,120 +268,21 @@
                 setIsGenerating(true);
 
                 try {
-                    const prompt = `# Role: Sherlock_Game_Engine_V2
-
-## Profile
-你是一个文字冒险游戏的后端剧情引擎。你的核心任务是处理玩家在《蓝宝石案》中的输入，判断其意图，并根据判定结果生成对应的剧情反馈或失败惩罚。
-
-## Context: Current Case State
-1. 基础信息
-- 时间/地点：12月27日早晨（圣诞节后），贝克街221B。
-- 人物：福尔摩斯、华生、彼得森（杂役）、玩家（“小队长”）。
-- 前情：彼得森在街头捡到一只鹅和一顶破帽子（失主受惊逃跑）。鹅归彼得森处理，帽子留作推演道具。
-
-2. 关键物品与推演结论
-- 物品：一顶破旧的黑色硬毡帽。
-- 失主侧写（已确立的事实）：
-  - 姓名：亨利·贝克（Henry Baker）。
-  - 经济状况：曾富裕（买得起昂贵帽子）现落魄（三年未换帽）。
-  - 家庭状况：夫妻关系冷淡（帽子积灰无人理），家中无煤气（帽子上有蜡烛油滴）。
-  - 个人习惯：近期刚剪发，涂抹柠檬发乳，有酗酒迹象。
-
-3. 剧情转折（Current Crisis）
-- 突发事件：彼得森在清理鹅的嗉子时，发现了“蓝宝石”（The Blue Carbuncle）。
-- 案件性质升级：从简单的“失物招领”升级为“莫尔卡伯爵夫人宝石失窃大案”。
-- 案件背景：管子工约翰·霍纳已被错误指控。为了查清真相，必须找到鹅和帽子的原主人——亨利·贝克。
-- 唯一线索：手中这顶破帽子。
-- 当前难题：如何在数万名伦敦市民中找到唯一的“亨利·贝克”。
-
-2. 关键设定
-- 正确解法：利用大众媒介（晚报）刊登失物招领启事，诱使失主主动上门。
-- 逻辑核心：与其在干草堆里找针，不如拿一块磁铁把针吸出来。
-
-## Task Workflow
-1. 分析输入：根据判定规则将用户输入归类为 CORRECT、STRATEGY 或 CHAT。
-2. 生成内容：根据类别生成对应的文本内容（福尔摩斯的台词 或 报纸惩罚）。
-3. 格式输出：输出标准的 JSON 对象。
-
-## Classification & Generation Rules
-### 1. 判定类别：CORRECT (正确策略)
-- 判定规则：用户明确提出了利用“报纸”“广告”“媒体”或“失物招领”来寻找失主。
-- 关键词：登报、晚报、广告、招领、启事。
-- 生成：写入 payload.message，语调兴奋、干练、赞许。
-
-### 2. 判定类别：STRATEGY (错误/低效策略)
-- 判定规则：提出行动但不属于登报。
-- 生成字段：
-  - newspaper_headline: 必须带【】的夸张标题
-  - newspaper_body: 混乱后果，80字以内
-  - editor_comment: 主编讽刺点评
-
-### 3. 判定类别：CHAT (闲聊/无效)
-- 判定规则：问候、元游戏发言、无意义字符、情绪宣泄。
-- 生成：payload.message，40字以内；暗示“纸张”“传播”“全伦敦的眼睛”，严禁直接出现“报纸”或“招领”字样。
-
-## Output JSON Structure
-不要用 answer 包裹，必须只输出 JSON：
-{
-  "status": "CORRECT | STRATEGY | CHAT",
-  "payload": {
-    "message": "String",
-    "newspaper_headline": "String",
-    "newspaper_body": "String",
-    "editor_comment": "String"
-  }
-}
-
-input: ${strategyInput}`;
-
-                    if (!DOUBAO_API_KEY) throw new Error("缺少豆包 API Key：请注入 window.__DOUBAO_API_KEY__");
-
-                    const response = await fetch(DOUBAO_API_URL, {
+                    const response = await fetch(DOUBAO_ACT2_ENDPOINT, {
                         method: 'POST',
                         headers: {
-                            'Authorization': `Bearer ${DOUBAO_API_KEY}`,
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({
-                            model: DOUBAO_MODEL,
-                            thinking: { type: "disabled" },
-                            input: [
-                                {
-                                    role: "user",
-                                    content: [{ type: "input_text", text: prompt }]
-                                }
-                            ]
-                        })
+                        body: JSON.stringify({ strategyInput })
                     });
 
                     if (!response.ok) throw new Error("豆包 API Request Failed");
 
-                    const data = await response.json();
-                    console.log("Doubao Result:", data);
-
-                    let result = null;
-                    let modelText = data.output_text || "";
-
-                    if (!modelText && Array.isArray(data.output)) {
-                        for (const item of data.output) {
-                            const contentList = item && item.content;
-                            if (!Array.isArray(contentList)) continue;
-                            for (const c of contentList) {
-                                if (c && (c.type === "output_text" || c.type === "text") && c.text) {
-                                    modelText += c.text;
-                                }
-                            }
-                        }
-                    }
-
-                    if (modelText) {
-                        const jsonMatch = modelText.match(/\{[\s\S]*\}/);
-                        const jsonStr = jsonMatch ? jsonMatch[0] : modelText;
-                        result = JSON.parse(jsonStr);
-                    }
+                    const result = await response.json();
+                    console.log("Doubao Proxy Result:", result);
 
                     if (!result || !result.status || !result.payload) {
-                        console.error("无法解析 API 返回数据:", data);
+                        console.error("无法解析 API 返回数据:", result);
                         throw new Error("API 返回数据格式无法识别");
                     }
 
